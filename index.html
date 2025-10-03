@@ -26,10 +26,7 @@
 
     .machine{background:linear-gradient(180deg,#1f1434,#140c23);border:1px solid #3b2e5f;border-radius:22px;padding:22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
     .reels{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
-    .reel{
-      /* quitamos marco interno para no duplicar con el de tus imágenes */
-      background:#0000;border:0;border-radius:14px;height:150px;display:flex;align-items:center;justify-content:center;
-    }
+    .reel{background:#0000;border:0;border-radius:14px;height:150px;display:flex;align-items:center;justify-content:center}
     .reel img{width:100%;height:100%;object-fit:cover;border-radius:12px}
     .actions{display:flex;gap:12px;align-items:center}
     .note{color:var(--muted);margin:10px 0 0;display:flex;gap:6px;align-items:center}
@@ -61,7 +58,7 @@
     </div>
 
     <div class="badge">🎰 Tragamonedas Yavalva</div>
-    <h1>Gira y gana premios 🎁<small>v6 con registro + cupones automáticos</small></h1>
+    <h1>Gira y gana premios 🎁<small>v6.1 con registro + cupones automáticos</small></h1>
 
     <div class="machine" id="machine">
       <div class="reels">
@@ -118,14 +115,14 @@
 
 <script>
 /* ======= Config ======= */
-const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwnTRWUTk0dWntaLX3WQTZqItXQu966xJ6DWwzkp78ck6S6uGQKacYnxebyBP7d0jXF/exec";
-const VERSION = "v6";
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyvcTvVWOVLzjF9lrfUScUjk9q-Hmze55YHC5cjW3zvqbOm1SmswFQgGdUoYCboEUgK/exec";
+const VERSION = "v6.1";
 const NAME_KEY = "yv_player_name";
 const MODO = new URLSearchParams(location.search).get("modo") || "basic";
 const EMPRESARIO = new URLSearchParams(location.search).get("empresario") || "";
 const PEDIDO = new URLSearchParams(location.search).get("pedido") || "";
 
-/* ======= Lista de imágenes (ajústala a tus nombres/paths) ======= */
+/* ======= Lista de imágenes (usa tus archivos en /img) ======= */
 const SYMBOLS = [
   "img/imgCarita1.jpg",
   "img/imgCarita2.jpg",
@@ -155,17 +152,17 @@ function sendBackend(payload){
     });
   }catch(e){}
 }
-function registrar(matchCount){
+function registrar(matchCount, codigo){
   const base = {
     version: VERSION, modo: MODO,
     nombre_completo: getName() || "Sin nombre",
     empresario: EMPRESARIO,
     nro_pedido_web: PEDIDO
   };
-  if(matchCount===0) return sendBackend({...base, resultado:"NO_GANO"});
-  if(matchCount===1) return sendBackend({...base, resultado:"GANÓ", premio_clave:"DESC10"});
-  if(matchCount===2) return sendBackend({...base, resultado:"GANÓ", premio_clave:"OBSEQ1"});
-  if(matchCount===3) return sendBackend({...base, resultado:"GANÓ", premio_clave:"DESC50"});
+  if(matchCount===0) return sendBackend({...base, resultado:"NO_GANO", codigo: codigo || ""});
+  if(matchCount===1) return sendBackend({...base, resultado:"GANÓ", premio_clave:"DESC10", codigo});
+  if(matchCount===2) return sendBackend({...base, resultado:"GANÓ", premio_clave:"OBSEQ1", codigo});
+  if(matchCount===3) return sendBackend({...base, resultado:"GANÓ", premio_clave:"DESC50", codigo});
 }
 
 /* ======= Juego ======= */
@@ -173,7 +170,7 @@ const r1=$("#r1"), r2=$("#r2"), r3=$("#r3"), msg=$("#resultMsg");
 const spinBtn=$("#spinBtn"), shareBtn=$("#shareBtn");
 
 function code(prefix){ return (prefix+"-"+Math.random().toString(36).slice(2,8)).toUpperCase(); }
-// retorna 0/1/2/3 según pesos: 84/10/5/1
+// 84% sin premio, 10% DESC10, 5% OBSEQ1, 1% DESC50
 function weightedMatch(){
   const n = Math.random()*100;
   if (n < 84) return 0;
@@ -194,18 +191,38 @@ function onSpin(){
   spinBtn.disabled=true; msg.textContent="Girando...";
   animateReels(()=>{
     const m = weightedMatch();
-    let pText="", pKey="", pCode="";
-    if (m===0){ msg.textContent="Sin premio, vuelve a intentarlo."; }
-    if (m===1){ pKey="DESC10"; pText="10% de descuento en tu próxima compra"; pCode=code("YV10"); }
-    if (m===2){ pKey="OBSEQ1"; pText="1 producto de obsequio por compras > $100.000 (no válido para kits)"; pCode=code("OBSEQ1"); }
-    if (m===3){ pKey="DESC50"; pText="50% de descuento en tu siguiente compra"; pCode=code("YV50"); }
-    if (m>0){
+    let pText="", pCode="";
+    if (m===0){
+      msg.textContent="Sin premio, vuelve a intentarlo.";
+      registrar(0, "");
+    }
+    if (m===1){
+      pText="10% de descuento en tu próxima compra";
+      pCode=code("YV10");
       $("#prizeText").textContent = pText;
       $("#prizeCode").textContent = pCode;
       $("#prizeDlg").showModal();
       msg.textContent = "¡Ganaste!";
+      registrar(1, pCode);
     }
-    registrar(m);
+    if (m===2){
+      pText="1 producto de obsequio por compras > $100.000 (no válido para kits)";
+      pCode=code("OBSEQ1");
+      $("#prizeText").textContent = pText;
+      $("#prizeCode").textContent = pCode;
+      $("#prizeDlg").showModal();
+      msg.textContent = "¡Ganaste!";
+      registrar(2, pCode);
+    }
+    if (m===3){
+      pText="50% de descuento en tu siguiente compra";
+      pCode=code("YV50");
+      $("#prizeText").textContent = pText;
+      $("#prizeCode").textContent = pCode;
+      $("#prizeDlg").showModal();
+      msg.textContent = "¡Ganaste!";
+      registrar(3, pCode);
+    }
     spinBtn.disabled=false;
   });
 }
