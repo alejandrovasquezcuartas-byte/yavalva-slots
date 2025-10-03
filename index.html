@@ -6,14 +6,12 @@
   <title>Tragamonedas Yavalva</title>
   <style>
     :root{
-      --bg1:#110b1a; --bg2:#1b1230; --panel:#231a38; --panel-2:#2c2246;
-      --txt:#f8fafc; --muted:#cbd5e1; --accent:#fbbf24; --btn:#f59e0b; --btn2:#2f2b37;
-      --green:#22c55e; --red:#ef4444;
+      --txt:#f8fafc; --muted:#cbd5e1; --btn:#f59e0b; --btn2:#2f2b37;
     }
     html,body{height:100%}
     body{
       margin:0; color:var(--txt);
-      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
       background: radial-gradient(1000px 600px at 50% -100px, #2a1f46 10%, #160f25 45%, #0e0a16 90%);
     }
     .wrap{max-width:920px;margin:24px auto;padding:12px}
@@ -28,12 +26,16 @@
 
     .machine{background:linear-gradient(180deg,#1f1434,#140c23);border:1px solid #3b2e5f;border-radius:22px;padding:22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
     .reels{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
-    .reel{background:linear-gradient(180deg,#fff9,#fff3);border:2px solid #c9a86d;border-radius:14px;height:150px;display:flex;align-items:center;justify-content:center;font-size:62px;box-shadow:inset 0 0 25px rgba(0,0,0,.25)}
+    .reel{
+      /* quitamos marco interno para no duplicar con el de tus imágenes */
+      background:#0000;border:0;border-radius:14px;height:150px;display:flex;align-items:center;justify-content:center;
+    }
+    .reel img{width:100%;height:100%;object-fit:cover;border-radius:12px}
     .actions{display:flex;gap:12px;align-items:center}
     .note{color:var(--muted);margin:10px 0 0;display:flex;gap:6px;align-items:center}
     .note .dot{width:8px;height:8px;background:#ffd54a;border-radius:50%}
 
-    .rules{margin-top:18px;background:var(--panel);border:1px solid #3b2e5f;border-radius:16px;overflow:hidden}
+    .rules{margin-top:18px;background:#231a38;border:1px solid #3b2e5f;border-radius:16px;overflow:hidden}
     .rules h3{margin:0;padding:14px 16px;border-bottom:1px solid #3b2e5f;font-size:16px}
     table{width:100%;border-collapse:collapse}
     th,td{padding:12px 14px;text-align:left}
@@ -46,7 +48,6 @@
     .field{display:flex;flex-direction:column;gap:6px;margin:8px 0 14px}
     input[type="text"]{background:#151025;border:1px solid #423463;border-radius:12px;color:var(--txt);padding:12px 14px;font-size:16px}
     .code{font-size:36px;font-weight:900;letter-spacing:1px;background:#1b132b;border:1px solid #3f2f63;padding:10px 12px;border-radius:12px;display:inline-block;margin-top:6px}
-
     .center{text-align:center}
     .big{font-size:20px}
   </style>
@@ -64,9 +65,9 @@
 
     <div class="machine" id="machine">
       <div class="reels">
-        <div class="reel" id="r1">🙂</div>
-        <div class="reel" id="r2">😄</div>
-        <div class="reel" id="r3">😉</div>
+        <div class="reel"><img id="r1" alt=""></div>
+        <div class="reel"><img id="r2" alt=""></div>
+        <div class="reel"><img id="r3" alt=""></div>
       </div>
       <div class="actions">
         <button id="spinBtn" class="btn primary">Girar</button>
@@ -124,17 +125,28 @@ const MODO = new URLSearchParams(location.search).get("modo") || "basic";
 const EMPRESARIO = new URLSearchParams(location.search).get("empresario") || "";
 const PEDIDO = new URLSearchParams(location.search).get("pedido") || "";
 
+/* ======= Lista de imágenes (ajústala a tus nombres/paths) ======= */
+const SYMBOLS = [
+  "imgCarita1.jpg",
+  "imgCarita2.jpg",
+  "imgCarita3.jpg",
+  "imgCarita4.jpg",
+  "imgCarita5.jpg"
+];
+// Preload
+SYMBOLS.forEach(src => { const i=new Image(); i.src=src; });
+
 /* ======= UI helpers ======= */
 const $ = sel => document.querySelector(sel);
 function getName(){ return localStorage.getItem(NAME_KEY) || ""; }
 function setName(v){ localStorage.setItem(NAME_KEY, (v||"").trim()); paintName(); }
 function paintName(){ $("#playerName").textContent = getName() || "no registrado"; }
 function showNameModal(){ $("#nameInput").value = getName(); $("#nameDlg").showModal(); }
+function randSym(){ return SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)]; }
 
 /* ======= Backend ======= */
 function sendBackend(payload){
   try{
-    // no-cors para evitar bloqueos del navegador: Apps Script igual recibe el JSON
     fetch(WEBAPP_URL, {
       method: "POST",
       mode: "no-cors",
@@ -157,14 +169,10 @@ function registrar(matchCount){
 }
 
 /* ======= Juego ======= */
-const faces = ["🙂","😄","😉","😁","😎","🤩","🥳"];
 const r1=$("#r1"), r2=$("#r2"), r3=$("#r3"), msg=$("#resultMsg");
 const spinBtn=$("#spinBtn"), shareBtn=$("#shareBtn");
 
-function randomFace(){ return faces[Math.floor(Math.random()*faces.length)]; }
-function code(prefix){
-  return (prefix+"-"+Math.random().toString(36).slice(2,8)).toUpperCase();
-}
+function code(prefix){ return (prefix+"-"+Math.random().toString(36).slice(2,8)).toUpperCase(); }
 // retorna 0/1/2/3 según pesos: 84/10/5/1
 function weightedMatch(){
   const n = Math.random()*100;
@@ -176,7 +184,7 @@ function weightedMatch(){
 function animateReels(cb){
   let i=0;
   const iv = setInterval(()=>{
-    r1.textContent=randomFace(); r2.textContent=randomFace(); r3.textContent=randomFace();
+    r1.src=randSym(); r2.src=randSym(); r3.src=randSym();
     if (++i>15){ clearInterval(iv); cb(); }
   }, 60);
 }
@@ -197,24 +205,30 @@ function onSpin(){
       $("#prizeDlg").showModal();
       msg.textContent = "¡Ganaste!";
     }
-    registrar(m); // envía al backend (crea cupón si corresponde)
+    registrar(m);
     spinBtn.disabled=false;
   });
 }
 
 /* ======= Eventos ======= */
 document.addEventListener("DOMContentLoaded", ()=>{
+  // Imagen inicial
+  r1.src=randSym(); r2.src=randSym(); r3.src=randSym();
   paintName();
+
   $("#changeName").addEventListener("click", ()=>{
     localStorage.removeItem(NAME_KEY);
     showNameModal();
   });
+
   $("#saveName").addEventListener("click", ()=>{
     setName($("#nameInput").value);
     $("#nameDlg").close();
   });
+
   $("#closePrize").addEventListener("click", ()=> $("#prizeDlg").close());
   spinBtn.addEventListener("click", onSpin);
+
   shareBtn.addEventListener("click", async ()=>{
     const url = location.href;
     try{
