@@ -1,171 +1,124 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tragamonedas Yavalva</title>
-  <style>
-    :root{ --txt:#f8fafc; --muted:#cbd5e1; --btn:#f59e0b; --btn2:#2f2b37; }
-    html,body{height:100%}
-    body{
-      margin:0; color:var(--txt);
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      background: radial-gradient(1000px 600px at 50% -120px, #2a1f46 10%, #160f25 45%, #0e0a16 90%);
-    }
-    .wrap{max-width:920px;margin:24px auto;padding:12px}
-    h1{font-size:42px;margin:14px 0 6px;text-align:center}
-    h1 small{display:block;font-size:14px;color:var(--muted);font-weight:500;margin-top:6px}
-    .badge{display:inline-block;margin:8px auto 18px;background:#3d2f60;padding:10px 14px;border-radius:999px;font-weight:700}
-    .topbar{display:flex;gap:10px;justify-content:center;align-items:center;margin:4px 0 8px}
-    .topbar .muted{color:var(--muted)}
-    .btn{appearance:none;border:0;background:var(--btn2);color:var(--txt);padding:8px 14px;border-radius:16px;font-weight:700;cursor:pointer}
-    .btn.primary{background:var(--btn); color:#1f1300; box-shadow:0 6px 20px rgba(245,158,11,.25)}
-    .btn:disabled{opacity:.6;cursor:not-allowed}
-
-    .machine{background:linear-gradient(180deg,#1f1434,#140c23);border:1px solid #3b2e5f;border-radius:22px;padding:22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
-    .reels{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
-    .reel{
-      background:#0b0713;border:1px solid #3b2e5f;border-radius:18px;
-      display:flex;align-items:center;justify-content:center;padding:10px;
-      aspect-ratio:1/1;
-      box-shadow: inset 0 8px 20px rgba(0,0,0,.35);
-    }
-    .reel img{
-      width:100%; height:100%; object-fit:contain;
-      border-radius:14px; background:#120b1d;
-    }
-    .actions{display:flex;gap:12px;align-items:center}
-    .note{color:var(--muted);margin:10px 0 0;display:flex;gap:6px;align-items:center}
-    .note .dot{width:8px;height:8px;background:#ffd54a;border-radius:50%}
-
-    .rules{margin-top:18px;background:#231a38;border:1px solid #3b2e5f;border-radius:16px;overflow:hidden}
-    .rules h3{margin:0;padding:14px 16px;border-bottom:1px solid #3b2e5f;font-size:16px}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:12px 14px;text-align:left}
-    tr+tr td{border-top:1px dashed #3b2e5f}
-    th{color:var(--muted);font-weight:700}
-
-    dialog{border:0;border-radius:18px;padding:0;background:#0f0b16;color:var(--txt);max-width:420px}
-    dialog::backdrop{background:rgba(0,0,0,.55)}
-    .card{padding:16px 18px}
-    .field{display:flex;flex-direction:column;gap:6px;margin:8px 0 14px}
-    input[type="text"]{background:#151025;border:1px solid #423463;border-radius:12px;color:var(--txt);padding:12px 14px;font-size:16px}
-    .code{font-size:36px;font-weight:900;letter-spacing:1px;background:#1b132b;border:1px solid #3f2f63;padding:10px 12px;border-radius:12px;display:inline-block;margin-top:6px}
-    .center{text-align:center}
-    .big{font-size:20px}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tragamonedas Yavalva</title>
+<style>
+  :root{ --txt:#f8fafc; --muted:#cbd5e1; --btn:#f59e0b; --btn2:#2f2b37; }
+  html,body{height:100%}
+  body{margin:0;color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    background: radial-gradient(1000px 600px at 50% -120px,#2a1f46 10%,#160f25 45%,#0e0a16 90%);}
+  .wrap{max-width:920px;margin:24px auto;padding:12px}
+  h1{font-size:42px;margin:14px 0 6px;text-align:center}
+  h1 small{display:block;font-size:14px;color:var(--muted);font-weight:500;margin-top:6px}
+  .badge{display:inline-block;margin:8px auto 18px;background:#3d2f60;padding:10px 14px;border-radius:999px;font-weight:700}
+  .topbar{display:flex;gap:10px;justify-content:center;align-items:center;margin:4px 0 8px}
+  .topbar .muted{color:var(--muted)}
+  .btn{appearance:none;border:0;background:var(--btn2);color:var(--txt);padding:8px 14px;border-radius:16px;font-weight:700;cursor:pointer}
+  .btn.primary{background:var(--btn); color:#1f1300; box-shadow:0 6px 20px rgba(245,158,11,.25)}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+  .machine{background:linear-gradient(180deg,#1f1434,#140c23);border:1px solid #3b2e5f;border-radius:22px;padding:22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  .reels{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+  .reel{background:#0b0713;border:1px solid #3b2e5f;border-radius:18px;display:flex;align-items:center;justify-content:center;padding:10px;aspect-ratio:1/1;box-shadow:inset 0 8px 20px rgba(0,0,0,.35)}
+  .reel img{width:100%;height:100%;object-fit:contain;border-radius:14px;background:#120b1d}
+  .actions{display:flex;gap:12px;align-items:center}
+  .note{color:var(--muted);margin:10px 0 0;display:flex;gap:6px;align-items:center}
+  .note .dot{width:8px;height:8px;background:#ffd54a;border-radius:50%}
+  .rules{margin-top:18px;background:#231a38;border:1px solid #3b2e5f;border-radius:16px;overflow:hidden}
+  .rules h3{margin:0;padding:14px 16px;border-bottom:1px solid #3b2e5f;font-size:16px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:12px 14px;text-align:left}
+  tr+tr td{border-top:1px dashed #3b2e5f}
+  th{color:var(--muted);font-weight:700}
+  dialog{border:0;border-radius:18px;padding:0;background:#0f0b16;color:var(--txt);max-width:420px}
+  dialog::backdrop{background:rgba(0,0,0,.55)}
+  .card{padding:16px 18px}
+  .field{display:flex;flex-direction:column;gap:6px;margin:8px 0 14px}
+  input[type="text"]{background:#151025;border:1px solid #423463;border-radius:12px;color:var(--txt);padding:12px 14px;font-size:16px}
+  .code{font-size:36px;font-weight:900;letter-spacing:1px;background:#1b132b;border:1px solid #3f2f63;padding:10px 12px;border-radius:12px;display:inline-block;margin-top:6px}
+  .center{text-align:center}
+  .big{font-size:20px}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="topbar">
-      <span class="muted">Jugador:</span>
-      <b id="playerName">no registrado</b>
-      <button id="changeName" class="btn">Cambiar nombre</button>
-    </div>
-
-    <div class="badge">🎰 Tragamonedas Yavalva</div>
-    <h1>Gira y gana premios 🎁<small>v6.2 por coincidencias reales</small></h1>
-
-    <div class="machine" id="machine">
-      <div class="reels">
-        <div class="reel"><img id="r1" alt=""></div>
-        <div class="reel"><img id="r2" alt=""></div>
-        <div class="reel"><img id="r3" alt=""></div>
-      </div>
-      <div class="actions">
-        <button id="spinBtn" class="btn primary">Girar</button>
-        <button id="shareBtn" class="btn">Compartir</button>
-      </div>
-      <div class="note"><span class="dot"></span><span id="resultMsg">Sin premio, vuelve a intentarlo.</span></div>
-    </div>
-
-    <div class="rules">
-      <h3>Reglas</h3>
-      <table>
-        <thead>
-          <tr><th>Productos en pantalla</th><th>Premio</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>0</td><td>Sin premio</td></tr>
-          <tr><td>1</td><td>Descuento del 10% (código DESC10)</td></tr>
-          <tr><td>2</td><td>1 producto de obsequio en compras &gt; $100.000 (no válido para kits) (código OBSEQ1)</td></tr>
-          <tr><td>3</td><td>Descuento del 50% en tu próxima compra (código DESC50)</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Modal nombre -->
-    <dialog id="nameDlg">
-      <div class="card">
-        <h3 class="center">Ingresa tu nombre completo</h3>
-        <div class="field">
-          <label for="nameInput">Nombre</label>
-          <input id="nameInput" type="text" placeholder="Ej: Ana Pérez" />
-        </div>
-        <div class="center">
-          <button id="saveName" class="btn primary">Continuar</button>
-        </div>
-      </div>
-    </dialog>
-
-    <!-- Modal premio -->
-    <dialog id="prizeDlg">
-      <div class="card center">
-        <div style="font-size:34px;margin-bottom:6px">🎉 ¡GANASTE! 🎉</div>
-        <div id="prizeText" class="big"></div>
-        <div id="prizeCode" class="code"></div>
-        <div style="margin-top:12px"><button id="closePrize" class="btn primary">Listo</button></div>
-      </div>
-    </dialog>
+<div class="wrap">
+  <div class="topbar">
+    <span class="muted">Jugador:</span>
+    <b id="playerName">no registrado</b>
+    <button id="changeName" class="btn">Cambiar nombre</button>
   </div>
+
+  <div class="badge">🎰 Tragamonedas Yavalva</div>
+  <h1>Gira y gana premios 🎁<small>v6.3 un solo símbolo ganador</small></h1>
+
+  <div class="machine" id="machine">
+    <div class="reels">
+      <div class="reel"><img id="r1" alt=""></div>
+      <div class="reel"><img id="r2" alt=""></div>
+      <div class="reel"><img id="r3" alt=""></div>
+    </div>
+    <div class="actions">
+      <button id="spinBtn" class="btn primary">Girar</button>
+      <button id="shareBtn" class="btn">Compartir</button>
+    </div>
+    <div class="note"><span class="dot"></span><span id="resultMsg">Sin premio, vuelve a intentarlo.</span></div>
+  </div>
+
+  <div class="rules">
+    <h3>Reglas</h3>
+    <table>
+      <thead><tr><th>Productos en pantalla</th><th>Premio</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>Sin premio</td></tr>
+        <tr><td>1</td><td>Descuento del 10% (código DESC10)</td></tr>
+        <tr><td>2</td><td>1 producto de obsequio en compras &gt; $100.000 (no válido para kits) (código OBSEQ1)</td></tr>
+        <tr><td>3</td><td>Descuento del 50% en tu próxima compra (código DESC50)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Modal nombre -->
+  <dialog id="nameDlg">
+    <div class="card">
+      <h3 class="center">Ingresa tu nombre completo</h3>
+      <div class="field">
+        <label for="nameInput">Nombre</label>
+        <input id="nameInput" type="text" placeholder="Ej: Ana Pérez" />
+      </div>
+      <div class="center"><button id="saveName" class="btn primary">Continuar</button></div>
+    </div>
+  </dialog>
+
+  <!-- Modal premio -->
+  <dialog id="prizeDlg">
+    <div class="card center">
+      <div style="font-size:34px;margin-bottom:6px">🎉 ¡GANASTE! 🎉</div>
+      <div id="prizeText" class="big"></div>
+      <div id="prizeCode" class="code"></div>
+      <div style="margin-top:12px"><button id="closePrize" class="btn primary">Listo</button></div>
+    </div>
+  </dialog>
+</div>
 
 <script>
 /* ======= Config ======= */
+/* URL del WebApp (Apps Script) */
 const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbxT_UKGC82d3nYDWiV_UBKKLW6O6Ee7gm2J10q2i_n72QUBwRQJ6asfHp31TbAUu2Cw/exec";
 const BACKUP_URL  = ""; // opcional
 
-const VERSION = "v6.2";
-const NAME_KEY = "yv_player_name";
-const MODO = new URLSearchParams(location.search).get("modo") || "basic";
-const EMPRESARIO = new URLSearchParams(location.search).get("empresario") || "";
-const PEDIDO = new URLSearchParams(location.search).get("pedido") || "";
-
-/* ======= Rutas REALES de tu repo =======
-   ⚠️ En tu GitHub los archivos se llaman:
-   - /img/fillers/imgCarita1.jpg, imgCarita2.jpg, imgCarita4.jpg, imgCarita5.jpg
-   - /img/products/imgCarita3.jpg  (de momento solo hay 1 en products)
-   Puedes cambiar o agregar más; solo ajusta estas listas. */
-const PRODUCT_SYMBOLS = [
-  "img/products/imgCarita3.jpg"
-];
-const FILLER_SYMBOLS = [
+/* Un único símbolo ganador (TU PRODUCTO) */
+const PRODUCT_IMAGE = "img/products/imgCarita3.jpg"; // <-- deja aquí el path exacto del producto
+/* Rellenos cuando NO gana */
+const FILLERS = [
   "img/fillers/imgCarita1.jpg",
   "img/fillers/imgCarita2.jpg",
   "img/fillers/imgCarita4.jpg",
   "img/fillers/imgCarita5.jpg"
 ];
 
-// Imagen de respaldo (PNG transparente 1x1) por si alguna ruta falla
-const PLACEHOLDER =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAIAAfsBBQq1kTQAAAAASUVORK5CYII=";
-
-// Preload + onerror fallback
-function preloadWithFallback(src){
-  const i = new Image();
-  i.onerror = ()=>{ i.src = PLACEHOLDER; };
-  i.src = src;
-}
-[...PRODUCT_SYMBOLS, ...FILLER_SYMBOLS].forEach(preloadWithFallback);
-
-/* ======= Helpers ======= */
-const $ = sel => document.querySelector(sel);
-function getName(){ return localStorage.getItem(NAME_KEY) || ""; }
-function setName(v){ localStorage.setItem(NAME_KEY, (v||"").trim()); paintName(); }
-function paintName(){ $("#playerName").textContent = getName() || "no registrado"; }
-function showNameModal(){ $("#nameInput").value = getName(); $("#nameDlg").showModal(); }
-function code(prefix){ return (prefix+"-"+Math.random().toString(36).slice(2,8)).toUpperCase(); }
-
-/* Probabilidades por número de productos */
+/* Probabilidades históricas (ajústalas si quieres):
+   0 prod: 84% | 1 prod: 10% | 2 prod: 5% | 3 prod: 1% */
 function chooseProductCount(){
   const n = Math.random()*100;
   if (n < 84) return 0;
@@ -174,110 +127,88 @@ function chooseProductCount(){
   return 3;
 }
 
-/* Elegir cualquiera (permite repetir si hay pocos archivos) */
-const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+/* ======= Base ======= */
+const VERSION = "v6.3";
+const NAME_KEY = "yv_player_name";
+const MODO = new URLSearchParams(location.search).get("modo") || "basic";
+const EMPRESARIO = new URLSearchParams(location.search).get("empresario") || "";
+const PEDIDO = new URLSearchParams(location.search).get("pedido") || "";
 
-/* Construir resultado final */
+const PLACEHOLDER="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAIAAfsBBQq1kTQAAAAASUVORK5CYII=";
+const $ = s => document.querySelector(s);
+function getName(){ return localStorage.getItem(NAME_KEY) || ""; }
+function setName(v){ localStorage.setItem(NAME_KEY,(v||"").trim()); paintName(); }
+function paintName(){ $("#playerName").textContent = getName() || "no registrado"; }
+function showNameModal(){ $("#nameInput").value = getName(); $("#nameDlg").showModal(); }
+function code(prefix){ return (prefix+"-"+Math.random().toString(36).slice(2,8)).toUpperCase(); }
+function safeSet(imgEl, src){ imgEl.onerror = ()=>{ imgEl.src = PLACEHOLDER; }; imgEl.src = src; }
+
+/* Construye la combinación final con el producto repetido si corresponde */
 function buildFinalReels(){
-  const count = chooseProductCount();
+  const count = chooseProductCount();      // cuantos productos deben quedar en pantalla (0-3)
   const out = [];
-  // Si no hay imágenes de productos aún, forzamos 0
-  const effectiveCount = PRODUCT_SYMBOLS.length ? count : 0;
-
-  for(let i=0;i<effectiveCount;i++) out.push({src: pick(PRODUCT_SYMBOLS), type:'product'});
-  for(let i=out.length;i<3;i++)       out.push({src: pick(FILLER_SYMBOLS),   type:'filler'});
-
+  for(let i=0;i<count;i++) out.push({src: PRODUCT_IMAGE, type:'product'});
+  for(let i=out.length;i<3;i++) out.push({src: FILLERS[Math.floor(Math.random()*FILLERS.length)], type:'filler'});
   // Mezclar posiciones
-  for(let i=out.length-1;i>0;i--){
-    const j = Math.floor(Math.random()*(i+1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
+  for(let i=out.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [out[i],out[j]]=[out[j],out[i]]; }
   return out;
 }
 
 /* ======= Backend ======= */
 function sendBackend(payload){
   try{
-    fetch(PRIMARY_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload) });
-    if (BACKUP_URL) {
-      fetch(BACKUP_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload) });
-    }
+    fetch(PRIMARY_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
+    if (BACKUP_URL) fetch(BACKUP_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
   }catch(e){}
 }
 function registrar(matchCount, codigo){
-  const base = {
-    version: VERSION, modo: MODO,
-    nombre_completo: getName() || "Sin nombre",
-    empresario: EMPRESARIO,
-    nro_pedido_web: PEDIDO
-  };
-  if(matchCount===0) return sendBackend({...base, resultado:"NO_GANO", codigo: codigo || ""});
-  if(matchCount===1) return sendBackend({...base, resultado:"GANÓ", premio_clave:"DESC10", codigo});
-  if(matchCount===2) return sendBackend({...base, resultado:"GANÓ", premio_clave:"OBSEQ1", codigo});
-  if(matchCount===3) return sendBackend({...base, resultado:"GANÓ", premio_clave:"DESC50", codigo});
+  const base={version:VERSION,modo:MODO,nombre_completo:getName()||"Sin nombre",empresario:EMPRESARIO,nro_pedido_web:PEDIDO};
+  if(matchCount===0) return sendBackend({...base,resultado:"NO_GANO",codigo:codigo||""});
+  if(matchCount===1) return sendBackend({...base,resultado:"GANÓ",premio_clave:"DESC10",codigo});
+  if(matchCount===2) return sendBackend({...base,resultado:"GANÓ",premio_clave:"OBSEQ1",codigo});
+  if(matchCount===3) return sendBackend({...base,resultado:"GANÓ",premio_clave:"DESC50",codigo});
 }
 
 /* ======= Juego ======= */
 const r1=$("#r1"), r2=$("#r2"), r3=$("#r3"), msg=$("#resultMsg");
 const spinBtn=$("#spinBtn"), shareBtn=$("#shareBtn");
 
-function safeSet(imgEl, src){
-  imgEl.onerror = ()=>{ imgEl.src = PLACEHOLDER; };
-  imgEl.src = src;
-}
-
 function animateSpin(frames=18, cb){
   let i=0;
-  const iv = setInterval(()=>{
-    safeSet(r1, pick(FILLER_SYMBOLS));
-    safeSet(r2, pick(FILLER_SYMBOLS));
-    safeSet(r3, pick(FILLER_SYMBOLS));
-    if (++i>=frames){ clearInterval(iv); cb(); }
-  }, 60);
+  const iv=setInterval(()=>{
+    safeSet(r1, FILLERS[Math.floor(Math.random()*FILLERS.length)]);
+    safeSet(r2, FILLERS[Math.floor(Math.random()*FILLERS.length)]);
+    safeSet(r3, FILLERS[Math.floor(Math.random()*FILLERS.length)]);
+    if(++i>=frames){ clearInterval(iv); cb(); }
+  },60);
 }
 
 function onSpin(){
-  if (!getName()){ showNameModal(); return; }
+  if(!getName()){ showNameModal(); return; }
   spinBtn.disabled=true; msg.textContent="Girando...";
-  const finalSet = buildFinalReels();
+  const finalSet=buildFinalReels();
   animateSpin(18, ()=>{
     safeSet(r1, finalSet[0].src);
     safeSet(r2, finalSet[1].src);
     safeSet(r3, finalSet[2].src);
 
     const productsOnScreen = finalSet.filter(x=>x.type==='product').length;
-
     let pText="", pCode="";
-    if (productsOnScreen===0){
+    if(productsOnScreen===0){
       msg.textContent="Sin premio, vuelve a intentarlo.";
-      registrar(0, "");
-    }
-    if (productsOnScreen===1){
-      pText="10% de descuento en tu próxima compra";
-      pCode=code("YV10");
-      $("#prizeText").textContent = pText;
-      $("#prizeCode").textContent = pCode;
-      $("#prizeDlg").showModal();
-      msg.textContent = "¡Ganaste!";
-      registrar(1, pCode);
-    }
-    if (productsOnScreen===2){
-      pText="1 producto de obsequio por compras > $100.000 (no válido para kits)";
-      pCode=code("OBSEQ1");
-      $("#prizeText").textContent = pText;
-      $("#prizeCode").textContent = pCode;
-      $("#prizeDlg").showModal();
-      msg.textContent = "¡Ganaste!";
-      registrar(2, pCode);
-    }
-    if (productsOnScreen===3){
-      pText="50% de descuento en tu siguiente compra";
-      pCode=code("YV50");
-      $("#prizeText").textContent = pText;
-      $("#prizeCode").textContent = pCode;
-      $("#prizeDlg").showModal();
-      msg.textContent = "¡Ganaste!";
-      registrar(3, pCode);
+      registrar(0,"");
+    }else if(productsOnScreen===1){
+      pText="10% de descuento en tu próxima compra"; pCode=code("YV10");
+      $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
+      msg.textContent="¡Ganaste!"; registrar(1,pCode);
+    }else if(productsOnScreen===2){
+      pText="1 producto de obsequio por compras > $100.000 (no válido para kits)"; pCode=code("OBSEQ1");
+      $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
+      msg.textContent="¡Ganaste!"; registrar(2,pCode);
+    }else{
+      pText="50% de descuento en tu siguiente compra"; pCode=code("YV50");
+      $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
+      msg.textContent="¡Ganaste!"; registrar(3,pCode);
     }
     spinBtn.disabled=false;
   });
@@ -285,31 +216,16 @@ function onSpin(){
 
 /* ======= Eventos ======= */
 document.addEventListener("DOMContentLoaded", ()=>{
-  // Imágenes iniciales
-  safeSet(r1, FILLER_SYMBOLS[0]);
-  safeSet(r2, FILLER_SYMBOLS[1] || FILLER_SYMBOLS[0]);
-  safeSet(r3, FILLER_SYMBOLS[2] || FILLER_SYMBOLS[0]);
+  safeSet(r1, FILLERS[0]); safeSet(r2, FILLERS[1]||FILLERS[0]); safeSet(r3, FILLERS[2]||FILLERS[0]);
   paintName();
-
-  $("#changeName").addEventListener("click", ()=>{
-    localStorage.removeItem(NAME_KEY);
-    showNameModal();
-  });
-
-  $("#saveName").addEventListener("click", ()=>{
-    setName($("#nameInput").value);
-    $("#nameDlg").close();
-  });
-
+  $("#changeName").addEventListener("click", ()=>{ localStorage.removeItem(NAME_KEY); showNameModal(); });
+  $("#saveName").addEventListener("click", ()=>{ setName($("#nameInput").value); $("#nameDlg").close(); });
   $("#closePrize").addEventListener("click", ()=> $("#prizeDlg").close());
-  spinBtn.addEventListener("click", onSpin);
-
+  $("#spinBtn").addEventListener("click", onSpin);
   shareBtn.addEventListener("click", async ()=>{
-    const url = location.href;
-    try{
-      if(navigator.share) await navigator.share({title:"Tragamonedas Yavalva", text:"¡Gira y gana premios!", url});
-      else navigator.clipboard && navigator.clipboard.writeText(url);
-    }catch(e){}
+    const url=location.href;
+    try{ if(navigator.share) await navigator.share({title:"Tragamonedas Yavalva",text:"¡Gira y gana premios!",url});
+         else navigator.clipboard && navigator.clipboard.writeText(url); }catch(e){}
   });
 });
 </script>
