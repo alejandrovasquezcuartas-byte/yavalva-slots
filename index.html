@@ -103,13 +103,11 @@
 
 <script>
 /* ======= Config ======= */
-/* URL del WebApp (Apps Script) */
-const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbxT_UKGC82d3nYDWiV_UBKKLW6O6Ee7gm2J10q2i_n72QUBwRQJ6asfHp31TbAUu2Cw/exec";
+const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbyjKg4VuX0LFTz98iaX7UTbHYuXD3PgVKdQaYuSmtXkG7Xc5q6aXkF8rioon_-1-Q4/exec";
 const BACKUP_URL  = ""; // opcional
 
-/* Un único símbolo ganador (TU PRODUCTO) */
-const PRODUCT_IMAGE = "img/products/imgCarita3.jpg"; // <-- deja aquí el path exacto del producto
-/* Rellenos cuando NO gana */
+/* Símbolo ganador (TU PRODUCTO) y rellenos */
+const PRODUCT_IMAGE = "img/products/imgCarita3.jpg";
 const FILLERS = [
   "img/fillers/imgCarita1.jpg",
   "img/fillers/imgCarita2.jpg",
@@ -117,8 +115,7 @@ const FILLERS = [
   "img/fillers/imgCarita5.jpg"
 ];
 
-/* Probabilidades históricas (ajústalas si quieres):
-   0 prod: 84% | 1 prod: 10% | 2 prod: 5% | 3 prod: 1% */
+/* Probabilidades históricas */
 function chooseProductCount(){
   const n = Math.random()*100;
   if (n < 84) return 0;
@@ -145,21 +142,40 @@ function safeSet(imgEl, src){ imgEl.onerror = ()=>{ imgEl.src = PLACEHOLDER; }; 
 
 /* Construye la combinación final con el producto repetido si corresponde */
 function buildFinalReels(){
-  const count = chooseProductCount();      // cuantos productos deben quedar en pantalla (0-3)
+  const count = chooseProductCount();
   const out = [];
   for(let i=0;i<count;i++) out.push({src: PRODUCT_IMAGE, type:'product'});
   for(let i=out.length;i<3;i++) out.push({src: FILLERS[Math.floor(Math.random()*FILLERS.length)], type:'filler'});
-  // Mezclar posiciones
   for(let i=out.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [out[i],out[j]]=[out[j],out[i]]; }
   return out;
 }
 
-/* ======= Backend ======= */
+/* ======= Backend (reforzado: fetch + sendBeacon) ======= */
 function sendBackend(payload){
-  try{
-    fetch(PRIMARY_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
-    if (BACKUP_URL) fetch(BACKUP_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
-  }catch(e){}
+  const body = JSON.stringify(payload);
+  const headers = { "Content-Type":"text/plain;charset=utf-8" };
+
+  // 1) fetch no-cors
+  try { fetch(PRIMARY_URL, { method:"POST", mode:"no-cors", headers, body }); } catch(e) {}
+
+  // 2) sendBeacon (fire-and-forget, confiable al cambiar de página)
+  try {
+    if (navigator.sendBeacon) {
+      const blob = new Blob([body], { type: "text/plain;charset=utf-8" });
+      navigator.sendBeacon(PRIMARY_URL, blob);
+    }
+  } catch(e) {}
+
+  // 3) opcional backup
+  if (BACKUP_URL) {
+    try { fetch(BACKUP_URL, { method:"POST", mode:"no-cors", headers, body }); } catch(e) {}
+    try {
+      if (navigator.sendBeacon) {
+        const blob2 = new Blob([body], { type: "text/plain;charset=utf-8" });
+        navigator.sendBeacon(BACKUP_URL, blob2);
+      }
+    } catch(e) {}
+  }
 }
 function registrar(matchCount, codigo){
   const base={version:VERSION,modo:MODO,nombre_completo:getName()||"Sin nombre",empresario:EMPRESARIO,nro_pedido_web:PEDIDO};
@@ -231,5 +247,3 @@ document.addEventListener("DOMContentLoaded", ()=>{
 </script>
 </body>
 </html>
-
-
