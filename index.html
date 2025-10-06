@@ -27,11 +27,11 @@
     .reel{
       background:#0b0713;border:1px solid #3b2e5f;border-radius:18px;
       display:flex;align-items:center;justify-content:center;padding:10px;
-      aspect-ratio:1/1;  /* SIEMPRE CUADRADO */
+      aspect-ratio:1/1;
       box-shadow: inset 0 8px 20px rgba(0,0,0,.35);
     }
     .reel img{
-      width:100%; height:100%; object-fit:contain;  /* NO CORTA IMAGEN */
+      width:100%; height:100%; object-fit:contain;
       border-radius:14px; background:#120b1d;
     }
     .actions{display:flex;gap:12px;align-items:center}
@@ -121,10 +121,8 @@
 
 <script>
 /* ======= Config ======= */
-/* Reemplaza PRIMARY_URL por el WebApp /exec ACTUAL.
-   Si tienes un deploy anterior, déjalo como BACKUP_URL (opcional). */
 const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbxT_UKGC82d3nYDWiV_UBKKLW6O6Ee7gm2J10q2i_n72QUBwRQJ6asfHp31TbAUu2Cw/exec";
-const BACKUP_URL  = "https://script.google.com/macros/s/AKfycbyvcTvVWOVLzjF9lrfUScUjk9q-Hmze55YHC5cjW3zvqbOm1SmswFQgGdUoYCboEUgK/exec";
+const BACKUP_URL  = ""; // opcional
 
 const VERSION = "v6.2";
 const NAME_KEY = "yv_player_name";
@@ -132,36 +130,42 @@ const MODO = new URLSearchParams(location.search).get("modo") || "basic";
 const EMPRESARIO = new URLSearchParams(location.search).get("empresario") || "";
 const PEDIDO = new URLSearchParams(location.search).get("pedido") || "";
 
-/* ======= Catálogo de símbolos =======
-   Pon tus imágenes de productos en /img/products/ (cuadradas 800x800 recomendado)
-   y tus rellenos en /img/fillers/                                  */
+/* ======= Rutas REALES de tu repo =======
+   ⚠️ En tu GitHub los archivos se llaman:
+   - /img/fillers/imgCarita1.jpg, imgCarita2.jpg, imgCarita4.jpg, imgCarita5.jpg
+   - /img/products/imgCarita3.jpg  (de momento solo hay 1 en products)
+   Puedes cambiar o agregar más; solo ajusta estas listas. */
 const PRODUCT_SYMBOLS = [
-  "img/products/prod1.jpg",
-  "img/products/prod2.jpg",
-  "img/products/prod3.jpg",
-  "img/products/prod4.jpg"
+  "img/products/imgCarita3.jpg"
 ];
 const FILLER_SYMBOLS = [
-  "img/fillers/face1.png",
-  "img/fillers/face2.png",
-  "img/fillers/face3.png",
-  "img/fillers/face4.png",
-  "img/fillers/face5.png"
+  "img/fillers/imgCarita1.jpg",
+  "img/fillers/imgCarita2.jpg",
+  "img/fillers/imgCarita4.jpg",
+  "img/fillers/imgCarita5.jpg"
 ];
-// Preload
-[...PRODUCT_SYMBOLS, ...FILLER_SYMBOLS].forEach(src => { const i=new Image(); i.src=src; });
 
-/* ======= UI helpers ======= */
+// Imagen de respaldo (PNG transparente 1x1) por si alguna ruta falla
+const PLACEHOLDER =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAIAAfsBBQq1kTQAAAAASUVORK5CYII=";
+
+// Preload + onerror fallback
+function preloadWithFallback(src){
+  const i = new Image();
+  i.onerror = ()=>{ i.src = PLACEHOLDER; };
+  i.src = src;
+}
+[...PRODUCT_SYMBOLS, ...FILLER_SYMBOLS].forEach(preloadWithFallback);
+
+/* ======= Helpers ======= */
 const $ = sel => document.querySelector(sel);
 function getName(){ return localStorage.getItem(NAME_KEY) || ""; }
 function setName(v){ localStorage.setItem(NAME_KEY, (v||"").trim()); paintName(); }
 function paintName(){ $("#playerName").textContent = getName() || "no registrado"; }
 function showNameModal(){ $("#nameInput").value = getName(); $("#nameDlg").showModal(); }
-
 function code(prefix){ return (prefix+"-"+Math.random().toString(36).slice(2,8)).toUpperCase(); }
 
-/* ======= Probabilidades (por conteo de PRODUCTOS) =======
-   0 prod: 84% | 1 prod: 10% | 2 prod: 5% | 3 prod: 1% */
+/* Probabilidades por número de productos */
 function chooseProductCount(){
   const n = Math.random()*100;
   if (n < 84) return 0;
@@ -170,18 +174,20 @@ function chooseProductCount(){
   return 3;
 }
 
-/* Devuelve arreglo final de 3 objetos {src, type:'product'|'filler'} */
+/* Elegir cualquiera (permite repetir si hay pocos archivos) */
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+
+/* Construir resultado final */
 function buildFinalReels(){
   const count = chooseProductCount();
-  const products = [...PRODUCT_SYMBOLS];
-  const fillers  = [...FILLER_SYMBOLS];
-  const pick = (arr) => arr.splice(Math.floor(Math.random()*arr.length),1)[0];
-
   const out = [];
-  for(let i=0;i<count;i++) out.push({src: pick(products), type:'product'});
-  for(let i=out.length;i<3;i++) out.push({src: pick(fillers), type:'filler'});
+  // Si no hay imágenes de productos aún, forzamos 0
+  const effectiveCount = PRODUCT_SYMBOLS.length ? count : 0;
 
-  // Mezclamos posiciones
+  for(let i=0;i<effectiveCount;i++) out.push({src: pick(PRODUCT_SYMBOLS), type:'product'});
+  for(let i=out.length;i<3;i++)       out.push({src: pick(FILLER_SYMBOLS),   type:'filler'});
+
+  // Mezclar posiciones
   for(let i=out.length-1;i>0;i--){
     const j = Math.floor(Math.random()*(i+1));
     [out[i], out[j]] = [out[j], out[i]];
@@ -191,7 +197,6 @@ function buildFinalReels(){
 
 /* ======= Backend ======= */
 function sendBackend(payload){
-  // Intento primario y, si hay backup, también lo mandamos “fire-and-forget”.
   try{
     fetch(PRIMARY_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload) });
     if (BACKUP_URL) {
@@ -216,13 +221,17 @@ function registrar(matchCount, codigo){
 const r1=$("#r1"), r2=$("#r2"), r3=$("#r3"), msg=$("#resultMsg");
 const spinBtn=$("#spinBtn"), shareBtn=$("#shareBtn");
 
+function safeSet(imgEl, src){
+  imgEl.onerror = ()=>{ imgEl.src = PLACEHOLDER; };
+  imgEl.src = src;
+}
+
 function animateSpin(frames=18, cb){
   let i=0;
   const iv = setInterval(()=>{
-    // animación solo con rellenos para velocidad
-    r1.src = FILLER_SYMBOLS[Math.floor(Math.random()*FILLER_SYMBOLS.length)];
-    r2.src = FILLER_SYMBOLS[Math.floor(Math.random()*FILLER_SYMBOLS.length)];
-    r3.src = FILLER_SYMBOLS[Math.floor(Math.random()*FILLER_SYMBOLS.length)];
+    safeSet(r1, pick(FILLER_SYMBOLS));
+    safeSet(r2, pick(FILLER_SYMBOLS));
+    safeSet(r3, pick(FILLER_SYMBOLS));
     if (++i>=frames){ clearInterval(iv); cb(); }
   }, 60);
 }
@@ -230,12 +239,11 @@ function animateSpin(frames=18, cb){
 function onSpin(){
   if (!getName()){ showNameModal(); return; }
   spinBtn.disabled=true; msg.textContent="Girando...";
-  const finalSet = buildFinalReels();   // ← aquí se decide el conteo real de productos
+  const finalSet = buildFinalReels();
   animateSpin(18, ()=>{
-    // Pintamos resultado final
-    r1.src = finalSet[0].src;
-    r2.src = finalSet[1].src;
-    r3.src = finalSet[2].src;
+    safeSet(r1, finalSet[0].src);
+    safeSet(r2, finalSet[1].src);
+    safeSet(r3, finalSet[2].src);
 
     const productsOnScreen = finalSet.filter(x=>x.type==='product').length;
 
@@ -277,8 +285,10 @@ function onSpin(){
 
 /* ======= Eventos ======= */
 document.addEventListener("DOMContentLoaded", ()=>{
-  // Imagen inicial
-  r1.src=FILLER_SYMBOLS[0]; r2.src=FILLER_SYMBOLS[1]; r3.src=FILLER_SYMBOLS[2];
+  // Imágenes iniciales
+  safeSet(r1, FILLER_SYMBOLS[0]);
+  safeSet(r2, FILLER_SYMBOLS[1] || FILLER_SYMBOLS[0]);
+  safeSet(r3, FILLER_SYMBOLS[2] || FILLER_SYMBOLS[0]);
   paintName();
 
   $("#changeName").addEventListener("click", ()=>{
@@ -305,4 +315,5 @@ document.addEventListener("DOMContentLoaded", ()=>{
 </script>
 </body>
 </html>
+
 
