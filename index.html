@@ -103,7 +103,7 @@
 
 <script>
 /* ======= Config ======= */
-const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbxH9w7fdY9siL4DnnPtYJ3o-B2XChUn8jgesX_TG2mpcwqK_AX_Yl5yJPIuyb6aZnXK/exec";
+const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbwebjUNSnt_GH_eM_CAT5aIKojCnAfySsZvgnAf7Q7T_bq3TtK0USiFYy6o4gWEgVC8/exec";
 const BACKUP_URL  = ""; // opcional
 
 /* Símbolo ganador (TU PRODUCTO) y rellenos */
@@ -140,6 +140,11 @@ function showNameModal(){ $("#nameInput").value = getName(); $("#nameDlg").showM
 function code(prefix){ return (prefix+"-"+Math.random().toString(36).slice(2,8)).toUpperCase(); }
 function safeSet(imgEl, src){ imgEl.onerror = ()=>{ imgEl.src = PLACEHOLDER; }; imgEl.src = src; }
 
+/* ======= spin id (para dedupe) ======= */
+function newEventId(){
+  return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,8);
+}
+
 /* Construye la combinación final con el producto repetido si corresponde */
 function buildFinalReels(){
   const count = chooseProductCount();
@@ -150,35 +155,15 @@ function buildFinalReels(){
   return out;
 }
 
-/* ======= Backend (reforzado: fetch + sendBeacon) ======= */
+/* ======= Backend (dejamos solo fetch; sendBeacon opcional) ======= */
 function sendBackend(payload){
-  const body = JSON.stringify(payload);
   const headers = { "Content-Type":"text/plain;charset=utf-8" };
-
-  // 1) fetch no-cors
+  const body = JSON.stringify(payload);
   try { fetch(PRIMARY_URL, { method:"POST", mode:"no-cors", headers, body }); } catch(e) {}
-
-  // 2) sendBeacon (fire-and-forget, confiable al cambiar de página)
-  try {
-    if (navigator.sendBeacon) {
-      const blob = new Blob([body], { type: "text/plain;charset=utf-8" });
-      navigator.sendBeacon(PRIMARY_URL, blob);
-    }
-  } catch(e) {}
-
-  // 3) opcional backup
-  if (BACKUP_URL) {
-    try { fetch(BACKUP_URL, { method:"POST", mode:"no-cors", headers, body }); } catch(e) {}
-    try {
-      if (navigator.sendBeacon) {
-        const blob2 = new Blob([body], { type: "text/plain;charset=utf-8" });
-        navigator.sendBeacon(BACKUP_URL, blob2);
-      }
-    } catch(e) {}
-  }
+  if (BACKUP_URL) { try { fetch(BACKUP_URL, { method:"POST", mode:"no-cors", headers, body }); } catch(e) {} }
 }
-function registrar(matchCount, codigo){
-  const base={version:VERSION,modo:MODO,nombre_completo:getName()||"Sin nombre",empresario:EMPRESARIO,nro_pedido_web:PEDIDO};
+function registrar(eventId, matchCount, codigo){
+  const base={event_id:eventId, version:VERSION, modo:MODO, nombre_completo:getName()||"Sin nombre", empresario:EMPRESARIO, nro_pedido_web:PEDIDO};
   if(matchCount===0) return sendBackend({...base,resultado:"NO_GANO",codigo:codigo||""});
   if(matchCount===1) return sendBackend({...base,resultado:"GANÓ",premio_clave:"DESC10",codigo});
   if(matchCount===2) return sendBackend({...base,resultado:"GANÓ",premio_clave:"OBSEQ1",codigo});
@@ -202,7 +187,10 @@ function animateSpin(frames=18, cb){
 function onSpin(){
   if(!getName()){ showNameModal(); return; }
   spinBtn.disabled=true; msg.textContent="Girando...";
+
+  const eventId = newEventId();            // ← id único por giro
   const finalSet=buildFinalReels();
+
   animateSpin(18, ()=>{
     safeSet(r1, finalSet[0].src);
     safeSet(r2, finalSet[1].src);
@@ -212,19 +200,19 @@ function onSpin(){
     let pText="", pCode="";
     if(productsOnScreen===0){
       msg.textContent="Sin premio, vuelve a intentarlo.";
-      registrar(0,"");
+      registrar(eventId,0,"");
     }else if(productsOnScreen===1){
       pText="10% de descuento en tu próxima compra"; pCode=code("YV10");
       $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
-      msg.textContent="¡Ganaste!"; registrar(1,pCode);
+      msg.textContent="¡Ganaste!"; registrar(eventId,1,pCode);
     }else if(productsOnScreen===2){
       pText="1 producto de obsequio por compras > $100.000 (no válido para kits)"; pCode=code("OBSEQ1");
       $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
-      msg.textContent="¡Ganaste!"; registrar(2,pCode);
+      msg.textContent="¡Ganaste!"; registrar(eventId,2,pCode);
     }else{
       pText="50% de descuento en tu siguiente compra"; pCode=code("YV50");
       $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
-      msg.textContent="¡Ganaste!"; registrar(3,pCode);
+      msg.textContent="¡Ganaste!"; registrar(eventId,3,pCode);
     }
     spinBtn.disabled=false;
   });
