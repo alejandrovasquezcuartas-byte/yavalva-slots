@@ -22,9 +22,10 @@
   .reels{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
   .reel{background:#0b0713;border:1px solid #3b2e5f;border-radius:18px;display:flex;align-items:center;justify-content:center;padding:10px;aspect-ratio:1/1;box-shadow:inset 0 8px 20px rgba(0,0,0,.35)}
   .reel img{width:100%;height:100%;object-fit:contain;border-radius:14px;background:#120b1d}
-  .actions{display:flex;gap:12px;align-items:center}
+  .actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   .note{color:var(--muted);margin:10px 0 0;display:flex;gap:6px;align-items:center}
   .note .dot{width:8px;height:8px;background:#ffd54a;border-radius:50%}
+  .quota{color:var(--muted);font-size:14px;margin-left:auto}
   .rules{margin-top:18px;background:#231a38;border:1px solid #3b2e5f;border-radius:16px;overflow:hidden}
   .rules h3{margin:0;padding:14px 16px;border-bottom:1px solid #3b2e5f;font-size:16px}
   table{width:100%;border-collapse:collapse}
@@ -61,6 +62,7 @@
     <div class="actions">
       <button id="spinBtn" class="btn primary">Girar</button>
       <button id="shareBtn" class="btn">Compartir</button>
+      <span id="quotaText" class="quota">—</span>
     </div>
     <div class="note"><span class="dot"></span><span id="resultMsg">Sin premio, vuelve a intentarlo.</span></div>
   </div>
@@ -103,7 +105,7 @@
 
 <script>
 /* ======= Config ======= */
-const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbwebjUNSnt_GH_eM_CAT5aIKojCnAfySsZvgnAf7Q7T_bq3TtK0USiFYy6o4gWEgVC8/exec";
+const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbwJok5Q3WDZOMZ5AIHibZwLqWJJOsbwiA38O81DWFO_n-c77Lfl9QddfV_jEyQ7svXU/exec";
 const BACKUP_URL  = ""; // opcional
 
 /* Símbolo ganador (TU PRODUCTO) y rellenos */
@@ -127,22 +129,43 @@ function chooseProductCount(){
 /* ======= Base ======= */
 const VERSION = "v6.3";
 const NAME_KEY = "yv_player_name";
-const MODO = new URLSearchParams(location.search).get("modo") || "basic";
-const EMPRESARIO = new URLSearchParams(location.search).get("empresario") || "";
-const PEDIDO = new URLSearchParams(location.search).get("pedido") || "";
-
-const PLACEHOLDER="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAIAAfsBBQq1kTQAAAAASUVORK5CYII=";
+const PID_KEY  = "yv_player_id";
 const $ = s => document.querySelector(s);
+
 function getName(){ return localStorage.getItem(NAME_KEY) || ""; }
 function setName(v){ localStorage.setItem(NAME_KEY,(v||"").trim()); paintName(); }
 function paintName(){ $("#playerName").textContent = getName() || "no registrado"; }
 function showNameModal(){ $("#nameInput").value = getName(); $("#nameDlg").showModal(); }
+
+function getPlayerId(){
+  let id = localStorage.getItem(PID_KEY);
+  if (!id) { id = (Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)).toUpperCase();
+             localStorage.setItem(PID_KEY, id); }
+  return id;
+}
+
 function code(prefix){ return (prefix+"-"+Math.random().toString(36).slice(2,8)).toUpperCase(); }
+const PLACEHOLDER="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAIAAfsBBQq1kTQAAAAASUVORK5CYII=";
 function safeSet(imgEl, src){ imgEl.onerror = ()=>{ imgEl.src = PLACEHOLDER; }; imgEl.src = src; }
 
-/* ======= spin id (para dedupe) ======= */
-function newEventId(){
-  return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,8);
+/* ======= CUPOS ======= */
+async function fetchQuota(){
+  const url = `${PRIMARY_URL}?quota=1&player_id=${encodeURIComponent(getPlayerId())}&nombre=${encodeURIComponent(getName())}`;
+  try{
+    const res = await fetch(url, { method:'GET' });
+    if (!res.ok) throw new Error('quota http '+res.status);
+    return await res.json(); // {limit, used, remaining}
+  }catch(e){
+    return { limit: null, used: null, remaining: null };
+  }
+}
+function renderQuota(q){
+  const el = $("#quotaText");
+  if (q && Number.isFinite(q.limit) && Number.isFinite(q.used)) {
+    el.textContent = `Te quedan ${Math.max(0,q.remaining)} de ${q.limit} giros hoy`;
+  } else {
+    el.textContent = ``;
+  }
 }
 
 /* Construye la combinación final con el producto repetido si corresponde */
@@ -155,7 +178,7 @@ function buildFinalReels(){
   return out;
 }
 
-/* ======= Backend (dejamos solo fetch; sendBeacon opcional) ======= */
+/* ======= Backend (mantengo fetch no-cors) ======= */
 function sendBackend(payload){
   const headers = { "Content-Type":"text/plain;charset=utf-8" };
   const body = JSON.stringify(payload);
@@ -163,7 +186,14 @@ function sendBackend(payload){
   if (BACKUP_URL) { try { fetch(BACKUP_URL, { method:"POST", mode:"no-cors", headers, body }); } catch(e) {} }
 }
 function registrar(eventId, matchCount, codigo){
-  const base={event_id:eventId, version:VERSION, modo:MODO, nombre_completo:getName()||"Sin nombre", empresario:EMPRESARIO, nro_pedido_web:PEDIDO};
+  const base={
+    event_id:eventId,
+    version:VERSION, modo:new URLSearchParams(location.search).get("modo") || "basic",
+    nombre_completo:getName()||"Sin nombre",
+    empresario:new URLSearchParams(location.search).get("empresario") || "",
+    nro_pedido_web:new URLSearchParams(location.search).get("pedido") || "",
+    player_id:getPlayerId()
+  };
   if(matchCount===0) return sendBackend({...base,resultado:"NO_GANO",codigo:codigo||""});
   if(matchCount===1) return sendBackend({...base,resultado:"GANÓ",premio_clave:"DESC10",codigo});
   if(matchCount===2) return sendBackend({...base,resultado:"GANÓ",premio_clave:"OBSEQ1",codigo});
@@ -184,14 +214,23 @@ function animateSpin(frames=18, cb){
   },60);
 }
 
-function onSpin(){
-  if(!getName()){ showNameModal(); return; }
-  spinBtn.disabled=true; msg.textContent="Girando...";
+function newEventId(){ return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8); }
 
-  const eventId = newEventId();            // ← id único por giro
+async function onSpin(){
+  if(!getName()){ showNameModal(); return; }
+
+  // 1) Consultamos cupo antes de girar
+  const q = await fetchQuota();
+  if (Number.isFinite(q?.limit) && Number.isFinite(q?.used) && q.remaining<=0) {
+    msg.textContent = `Alcanzaste tu límite de ${q.limit} giros hoy.`;
+    return;
+  }
+
+  spinBtn.disabled=true; msg.textContent="Girando...";
+  const eventId = newEventId();
   const finalSet=buildFinalReels();
 
-  animateSpin(18, ()=>{
+  animateSpin(18, async ()=>{
     safeSet(r1, finalSet[0].src);
     safeSet(r2, finalSet[1].src);
     safeSet(r3, finalSet[2].src);
@@ -214,23 +253,37 @@ function onSpin(){
       $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
       msg.textContent="¡Ganaste!"; registrar(eventId,3,pCode);
     }
+
+    // 2) refrescamos cupo (servidor incrementa al recibir el POST)
+    setTimeout(async ()=>{
+      const q2 = await fetchQuota();
+      renderQuota(q2);
+    }, 600);
+
     spinBtn.disabled=false;
   });
 }
 
 /* ======= Eventos ======= */
-document.addEventListener("DOMContentLoaded", ()=>{
+document.addEventListener("DOMContentLoaded", async ()=>{
   safeSet(r1, FILLERS[0]); safeSet(r2, FILLERS[1]||FILLERS[0]); safeSet(r3, FILLERS[2]||FILLERS[0]);
   paintName();
+
   $("#changeName").addEventListener("click", ()=>{ localStorage.removeItem(NAME_KEY); showNameModal(); });
   $("#saveName").addEventListener("click", ()=>{ setName($("#nameInput").value); $("#nameDlg").close(); });
+
   $("#closePrize").addEventListener("click", ()=> $("#prizeDlg").close());
   $("#spinBtn").addEventListener("click", onSpin);
+
   shareBtn.addEventListener("click", async ()=>{
     const url=location.href;
     try{ if(navigator.share) await navigator.share({title:"Tragamonedas Yavalva",text:"¡Gira y gana premios!",url});
          else navigator.clipboard && navigator.clipboard.writeText(url); }catch(e){}
   });
+
+  // Pintamos cupo inicial
+  const q = await fetchQuota();
+  renderQuota(q);
 });
 </script>
 </body>
