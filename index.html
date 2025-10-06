@@ -105,10 +105,10 @@
 
 <script>
 /* ======= Config ======= */
-const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbwLh9uu9e8c_aDmoX28xZuxTrZkoTA_P5v2QAnVcdXC2lWeRlw2Z7ha_dhCd32XrEcW/exec";
-const BACKUP_URL  = ""; // opcional
+/* Pega aquí TU URL de Aplicación web (la que termina en /exec). Ya dejé la tuya: */
+const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbzbPD8D0zBFxFRCOcNwt_yCbEUw_JbWjuRmUGQZcop_4jV3GbbSjLEikr_hVKBEaZJt/exec";
 
-/* Símbolo ganador (TU PRODUCTO) y rellenos */
+/* Símbolo ganador y fillers (como los tienes en GitHub) */
 const PRODUCT_IMAGE = "img/products/imgCarita3.jpg";
 const FILLERS = [
   "img/fillers/imgCarita1.jpg",
@@ -118,7 +118,7 @@ const FILLERS = [
 ];
 function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
-/* Probabilidades históricas */
+/* Probabilidades (sin tocar la lógica que ya estabilizamos) */
 function chooseProductCount(){
   const n = Math.random()*100;
   if (n < 84) return 0;
@@ -140,8 +140,10 @@ function showNameModal(){ $("#nameInput").value = getName(); $("#nameDlg").showM
 
 function getPlayerId(){
   let id = localStorage.getItem(PID_KEY);
-  if (!id) { id = (Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)).toUpperCase();
-             localStorage.setItem(PID_KEY, id); }
+  if (!id) {
+    id = (Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)).toUpperCase();
+    localStorage.setItem(PID_KEY, id);
+  }
   return id;
 }
 
@@ -149,12 +151,11 @@ function code(prefix){ return (prefix+"-"+Math.random().toString(36).slice(2,8))
 const PLACEHOLDER="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAIAAfsBBQq1kTQAAAAASUVORK5CYII=";
 function safeSet(imgEl, src){ imgEl.onerror = ()=>{ imgEl.src = PLACEHOLDER; }; imgEl.src = src; }
 
-/* ======= CUPOS (mostrar) ======= */
+/* ======= CUPOS ======= */
 async function fetchQuota(){
-  const url = `${PRIMARY_URL}?quota=1&player_id=${encodeURIComponent(getPlayerId())}&nombre=${encodeURIComponent(getName())}`;
   try{
+    const url = `${PRIMARY_URL}?quota=1&player_id=${encodeURIComponent(getPlayerId())}`;
     const res = await fetch(url, { method:'GET' });
-    if (!res.ok) throw new Error('quota http '+res.status);
     const q = await res.json();
     renderQuota(q);
   }catch(e){ /* silencioso */ }
@@ -163,17 +164,22 @@ function renderQuota(q){
   const el = $("#quotaText");
   if (q && Number.isFinite(q.limit) && Number.isFinite(q.used)) {
     el.textContent = `Te quedan ${Math.max(0,q.remaining)} de ${q.limit} giros hoy`;
-  } else {
-    el.textContent = ``;
-  }
+  } else { el.textContent = ``; }
 }
 
-/* ======= RESERVA ESTRICTA ======= */
+/* ======= RESERVA con tolerancia a fallos ======= */
 async function reserveSpin(){
-  const url = `${PRIMARY_URL}?reserve=1&player_id=${encodeURIComponent(getPlayerId())}&nombre=${encodeURIComponent(getName())}`;
-  const res = await fetch(url, { method:'GET' });
-  if (!res.ok) throw new Error('reserve http '+res.status);
-  return await res.json(); // {ok, allowed, limit, remaining, token}
+  try{
+    const url = `${PRIMARY_URL}?reserve=1&player_id=${encodeURIComponent(getPlayerId())}`;
+    const res = await fetch(url, { method:'GET' });
+    const json = await res.json();
+    if (typeof json === 'object' && 'allowed' in json) return json;
+    // si el backend devolviera algo inesperado, dejamos girar (el POST bloqueará si toca)
+    return { ok:false, allowed:true, token:'' };
+  }catch(e){
+    // fallo de red/URL: dejamos girar (el POST bloqueará si toca)
+    return { ok:false, allowed:true, token:'' };
+  }
 }
 
 /* ======= Máquina ======= */
@@ -195,15 +201,15 @@ function sendBackend(payload){
   const headers = { "Content-Type":"text/plain;charset=utf-8" };
   const body = JSON.stringify(payload);
   try { fetch(PRIMARY_URL, { method:"POST", mode:"no-cors", headers, body }); } catch(e) {}
-  if (BACKUP_URL) { try { fetch(BACKUP_URL, { method:"POST", mode:"no-cors", headers, body }); } catch(e) {} }
 }
 function registrar(eventId, matchCount, codigo, reserveToken){
+  const qs = new URLSearchParams(location.search);
   const base={
     event_id:eventId, reserve_token: reserveToken,
-    version:VERSION, modo:new URLSearchParams(location.search).get("modo") || "basic",
+    version:VERSION, modo: qs.get("modo") || "basic",
     nombre_completo:getName()||"Sin nombre",
-    empresario:new URLSearchParams(location.search).get("empresario") || "",
-    nro_pedido_web:new URLSearchParams(location.search).get("pedido") || "",
+    empresario:qs.get("empresario") || "",
+    nro_pedido_web:qs.get("pedido") || "",
     player_id:getPlayerId()
   };
   if(matchCount===0) return sendBackend({...base,resultado:"NO_GANO",codigo:codigo||""});
@@ -212,66 +218,6 @@ function registrar(eventId, matchCount, codigo, reserveToken){
   if(matchCount===3) return sendBackend({...base,resultado:"GANÓ",premio_clave:"DESC50",codigo});
 }
 
-async function onSpin(){
-  if(!getName()){ showNameModal(); return; }
-
-  spinBtn.disabled=true;
-
-  // 1) pedimos RESERVA (estricto) en paralelo a la animación
-  let reserve = null, reserveError = null;
-  const reservePromise = reserveSpin().then(r=>reserve=r).catch(e=>reserveError=e);
-
-  // 2) animamos inmediatamente (sin lag)
-  msg.textContent="Girando...";
-  const eventId = newEventId();
-  const finalSet=buildFinalReels();
-
-  animateSpin(18, async ()=>{
-    // aseguramos que la reserva haya terminado
-    if (!reserve && !reserveError) { try { reserve = await reservePromise; } catch(e){ reserveError=e; } }
-
-    // si no hay cupo, bloqueamos y NO registramos
-    if (reserveError || !reserve?.ok || !reserve?.allowed) {
-      msg.textContent = `Alcanzaste tu límite de giros hoy.`;
-      spinBtn.disabled=false;
-      // refrescamos el contador visible
-      fetchQuota();
-      // mostramos algo neutro
-      safeSet(r1, pick(FILLERS)); safeSet(r2, pick(FILLERS)); safeSet(r3, pick(FILLERS));
-      return;
-    }
-
-    // 3) mostramos el resultado
-    safeSet(r1, finalSet[0].src);
-    safeSet(r2, finalSet[1].src);
-    safeSet(r3, finalSet[2].src);
-
-    const productsOnScreen = finalSet.filter(x=>x.type==='product').length;
-    let pText="", pCode="";
-    if(productsOnScreen===0){
-      msg.textContent="Sin premio, vuelve a intentarlo.";
-      registrar(eventId,0,"", reserve.token);
-    }else if(productsOnScreen===1){
-      pText="10% de descuento en tu próxima compra"; pCode=code("YV10");
-      $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
-      msg.textContent="¡Ganaste!"; registrar(eventId,1,pCode, reserve.token);
-    }else if(productsOnScreen===2){
-      pText="1 producto de obsequio por compras > $100.000 (no válido para kits)"; pCode=code("OBSEQ1");
-      $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
-      msg.textContent="¡Ganaste!"; registrar(eventId,2,pCode, reserve.token);
-    }else{
-      pText="50% de descuento en tu siguiente compra"; pCode=code("YV50");
-      $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
-      msg.textContent="¡Ganaste!"; registrar(eventId,3,pCode, reserve.token);
-    }
-
-    // 4) refrescamos cupo visible
-    setTimeout(fetchQuota, 800);
-    spinBtn.disabled=false;
-  });
-}
-
-/* ======= Helpers ======= */
 function buildFinalReels(){
   const count = chooseProductCount();
   const out = [];
@@ -281,8 +227,54 @@ function buildFinalReels(){
   return out;
 }
 
+async function onSpin(){
+  if(!getName()){ showNameModal(); return; }
+  spinBtn.disabled=true;
+
+  // Reserva (si el backend dice que NO, bloqueamos; si falla, dejamos pasar)
+  const reserve = await reserveSpin();
+  if (reserve && reserve.ok && reserve.allowed === false) {
+    msg.textContent = `Alcanzaste tu límite de giros hoy.`;
+    spinBtn.disabled=false;
+    fetchQuota();
+    return;
+  }
+
+  msg.textContent="Girando...";
+  const eventId = newEventId();
+  const finalSet=buildFinalReels();
+
+  animateSpin(18, ()=>{
+    safeSet(r1, finalSet[0].src);
+    safeSet(r2, finalSet[1].src);
+    safeSet(r3, finalSet[2].src);
+
+    const productsOnScreen = finalSet.filter(x=>x.type==='product').length;
+    let pText="", pCode="", token = reserve ? reserve.token || "" : "";
+    if(productsOnScreen===0){
+      msg.textContent="Sin premio, vuelve a intentarlo.";
+      registrar(eventId,0,"", token);
+    }else if(productsOnScreen===1){
+      pText="10% de descuento en tu próxima compra"; pCode=code("YV10");
+      $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
+      msg.textContent="¡Ganaste!"; registrar(eventId,1,pCode, token);
+    }else if(productsOnScreen===2){
+      pText="1 producto de obsequio por compras > $100.000 (no válido para kits)"; pCode=code("OBSEQ1");
+      $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
+      msg.textContent="¡Ganaste!"; registrar(eventId,2,pCode, token);
+    }else{
+      pText="50% de descuento en tu siguiente compra"; pCode=code("YV50");
+      $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
+      msg.textContent="¡Ganaste!"; registrar(eventId,3,pCode, token);
+    }
+
+    setTimeout(fetchQuota, 800);
+    spinBtn.disabled=false;
+  });
+}
+
 /* ======= Eventos ======= */
-document.addEventListener("DOMContentLoaded", async ()=>{
+document.addEventListener("DOMContentLoaded", ()=>{
   safeSet(r1, pick(FILLERS)); safeSet(r2, pick(FILLERS)); safeSet(r3, pick(FILLERS));
   paintName();
 
@@ -292,16 +284,14 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   $("#closePrize").addEventListener("click", ()=> $("#prizeDlg").close());
   $("#spinBtn").addEventListener("click", onSpin);
 
-  shareBtn.addEventListener("click", async ()=>{
+  $("#shareBtn").addEventListener("click", async ()=>{
     const url=location.href;
     try{ if(navigator.share) await navigator.share({title:"Tragamonedas Yavalva",text:"¡Gira y gana premios!",url});
          else navigator.clipboard && navigator.clipboard.writeText(url); }catch(e){}
   });
 
-  // pinta contador al cargar
   fetchQuota();
 });
 </script>
 </body>
 </html>
-
