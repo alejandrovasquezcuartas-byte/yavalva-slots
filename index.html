@@ -5,14 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tragamonedas Yavalva</title>
   <style>
-    :root{
-      --txt:#f8fafc; --muted:#cbd5e1; --btn:#f59e0b; --btn2:#2f2b37;
-    }
+    :root{ --txt:#f8fafc; --muted:#cbd5e1; --btn:#f59e0b; --btn2:#2f2b37; }
     html,body{height:100%}
     body{
       margin:0; color:var(--txt);
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      background: radial-gradient(1000px 600px at 50% -100px, #2a1f46 10%, #160f25 45%, #0e0a16 90%);
+      background: radial-gradient(1000px 600px at 50% -120px, #2a1f46 10%, #160f25 45%, #0e0a16 90%);
     }
     .wrap{max-width:920px;margin:24px auto;padding:12px}
     h1{font-size:42px;margin:14px 0 6px;text-align:center}
@@ -26,8 +24,16 @@
 
     .machine{background:linear-gradient(180deg,#1f1434,#140c23);border:1px solid #3b2e5f;border-radius:22px;padding:22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
     .reels{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
-    .reel{background:#0000;border:0;border-radius:14px;height:150px;display:flex;align-items:center;justify-content:center}
-    .reel img{width:100%;height:100%;object-fit:cover;border-radius:12px}
+    .reel{
+      background:#0b0713;border:1px solid #3b2e5f;border-radius:18px;
+      display:flex;align-items:center;justify-content:center;padding:10px;
+      aspect-ratio:1/1;  /* SIEMPRE CUADRADO */
+      box-shadow: inset 0 8px 20px rgba(0,0,0,.35);
+    }
+    .reel img{
+      width:100%; height:100%; object-fit:contain;  /* NO CORTA IMAGEN */
+      border-radius:14px; background:#120b1d;
+    }
     .actions{display:flex;gap:12px;align-items:center}
     .note{color:var(--muted);margin:10px 0 0;display:flex;gap:6px;align-items:center}
     .note .dot{width:8px;height:8px;background:#ffd54a;border-radius:50%}
@@ -58,7 +64,7 @@
     </div>
 
     <div class="badge">🎰 Tragamonedas Yavalva</div>
-    <h1>Gira y gana premios 🎁<small>v6.1 con registro + cupones automáticos</small></h1>
+    <h1>Gira y gana premios 🎁<small>v6.2 por coincidencias reales</small></h1>
 
     <div class="machine" id="machine">
       <div class="reels">
@@ -115,23 +121,35 @@
 
 <script>
 /* ======= Config ======= */
-const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyLCV5Ch7JbLkLKB6Jggiksq79nBvU1YPuCN96j36he2KpGDdPN-Bl3rBDOVuMDjaIt/exec";
-const VERSION = "v6.1";
+/* Reemplaza PRIMARY_URL por el WebApp /exec ACTUAL.
+   Si tienes un deploy anterior, déjalo como BACKUP_URL (opcional). */
+const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbyLCV5Ch7JbLkLKB6Jggiksq79nBvU1YPuCN96j36he2KpGDdPN-Bl3rBDOVuMDjaIt/exec";
+const BACKUP_URL  = "https://script.google.com/macros/s/AKfycbyvcTvVWOVLzjF9lrfUScUjk9q-Hmze55YHC5cjW3zvqbOm1SmswFQgGdUoYCboEUgK/exec";
+
+const VERSION = "v6.2";
 const NAME_KEY = "yv_player_name";
 const MODO = new URLSearchParams(location.search).get("modo") || "basic";
 const EMPRESARIO = new URLSearchParams(location.search).get("empresario") || "";
 const PEDIDO = new URLSearchParams(location.search).get("pedido") || "";
 
-/* ======= Lista de imágenes (usa tus archivos en /img) ======= */
-const SYMBOLS = [
-  "img/imgCarita1.jpg",
-  "img/imgCarita2.jpg",
-  "img/imgCarita3.jpg",
-  "img/imgCarita4.jpg",
-  "img/imgCarita5.jpg"
+/* ======= Catálogo de símbolos =======
+   Pon tus imágenes de productos en /img/products/ (cuadradas 800x800 recomendado)
+   y tus rellenos en /img/fillers/                                  */
+const PRODUCT_SYMBOLS = [
+  "img/products/prod1.jpg",
+  "img/products/prod2.jpg",
+  "img/products/prod3.jpg",
+  "img/products/prod4.jpg"
+];
+const FILLER_SYMBOLS = [
+  "img/fillers/face1.png",
+  "img/fillers/face2.png",
+  "img/fillers/face3.png",
+  "img/fillers/face4.png",
+  "img/fillers/face5.png"
 ];
 // Preload
-SYMBOLS.forEach(src => { const i=new Image(); i.src=src; });
+[...PRODUCT_SYMBOLS, ...FILLER_SYMBOLS].forEach(src => { const i=new Image(); i.src=src; });
 
 /* ======= UI helpers ======= */
 const $ = sel => document.querySelector(sel);
@@ -139,17 +157,46 @@ function getName(){ return localStorage.getItem(NAME_KEY) || ""; }
 function setName(v){ localStorage.setItem(NAME_KEY, (v||"").trim()); paintName(); }
 function paintName(){ $("#playerName").textContent = getName() || "no registrado"; }
 function showNameModal(){ $("#nameInput").value = getName(); $("#nameDlg").showModal(); }
-function randSym(){ return SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)]; }
+
+function code(prefix){ return (prefix+"-"+Math.random().toString(36).slice(2,8)).toUpperCase(); }
+
+/* ======= Probabilidades (por conteo de PRODUCTOS) =======
+   0 prod: 84% | 1 prod: 10% | 2 prod: 5% | 3 prod: 1% */
+function chooseProductCount(){
+  const n = Math.random()*100;
+  if (n < 84) return 0;
+  if (n < 94) return 1;
+  if (n < 99) return 2;
+  return 3;
+}
+
+/* Devuelve arreglo final de 3 objetos {src, type:'product'|'filler'} */
+function buildFinalReels(){
+  const count = chooseProductCount();
+  const products = [...PRODUCT_SYMBOLS];
+  const fillers  = [...FILLER_SYMBOLS];
+  const pick = (arr) => arr.splice(Math.floor(Math.random()*arr.length),1)[0];
+
+  const out = [];
+  for(let i=0;i<count;i++) out.push({src: pick(products), type:'product'});
+  for(let i=out.length;i<3;i++) out.push({src: pick(fillers), type:'filler'});
+
+  // Mezclamos posiciones
+  for(let i=out.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 /* ======= Backend ======= */
 function sendBackend(payload){
+  // Intento primario y, si hay backup, también lo mandamos “fire-and-forget”.
   try{
-    fetch(WEBAPP_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {"Content-Type":"text/plain;charset=utf-8"},
-      body: JSON.stringify(payload)
-    });
+    fetch(PRIMARY_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload) });
+    if (BACKUP_URL) {
+      fetch(BACKUP_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload) });
+    }
   }catch(e){}
 }
 function registrar(matchCount, codigo){
@@ -169,34 +216,35 @@ function registrar(matchCount, codigo){
 const r1=$("#r1"), r2=$("#r2"), r3=$("#r3"), msg=$("#resultMsg");
 const spinBtn=$("#spinBtn"), shareBtn=$("#shareBtn");
 
-function code(prefix){ return (prefix+"-"+Math.random().toString(36).slice(2,8)).toUpperCase(); }
-// 84% sin premio, 10% DESC10, 5% OBSEQ1, 1% DESC50
-function weightedMatch(){
-  const n = Math.random()*100;
-  if (n < 84) return 0;
-  if (n < 94) return 1;
-  if (n < 99) return 2;
-  return 3;
-}
-function animateReels(cb){
+function animateSpin(frames=18, cb){
   let i=0;
   const iv = setInterval(()=>{
-    r1.src=randSym(); r2.src=randSym(); r3.src=randSym();
-    if (++i>15){ clearInterval(iv); cb(); }
+    // animación solo con rellenos para velocidad
+    r1.src = FILLER_SYMBOLS[Math.floor(Math.random()*FILLER_SYMBOLS.length)];
+    r2.src = FILLER_SYMBOLS[Math.floor(Math.random()*FILLER_SYMBOLS.length)];
+    r3.src = FILLER_SYMBOLS[Math.floor(Math.random()*FILLER_SYMBOLS.length)];
+    if (++i>=frames){ clearInterval(iv); cb(); }
   }, 60);
 }
 
 function onSpin(){
   if (!getName()){ showNameModal(); return; }
   spinBtn.disabled=true; msg.textContent="Girando...";
-  animateReels(()=>{
-    const m = weightedMatch();
+  const finalSet = buildFinalReels();   // ← aquí se decide el conteo real de productos
+  animateSpin(18, ()=>{
+    // Pintamos resultado final
+    r1.src = finalSet[0].src;
+    r2.src = finalSet[1].src;
+    r3.src = finalSet[2].src;
+
+    const productsOnScreen = finalSet.filter(x=>x.type==='product').length;
+
     let pText="", pCode="";
-    if (m===0){
+    if (productsOnScreen===0){
       msg.textContent="Sin premio, vuelve a intentarlo.";
       registrar(0, "");
     }
-    if (m===1){
+    if (productsOnScreen===1){
       pText="10% de descuento en tu próxima compra";
       pCode=code("YV10");
       $("#prizeText").textContent = pText;
@@ -205,7 +253,7 @@ function onSpin(){
       msg.textContent = "¡Ganaste!";
       registrar(1, pCode);
     }
-    if (m===2){
+    if (productsOnScreen===2){
       pText="1 producto de obsequio por compras > $100.000 (no válido para kits)";
       pCode=code("OBSEQ1");
       $("#prizeText").textContent = pText;
@@ -214,7 +262,7 @@ function onSpin(){
       msg.textContent = "¡Ganaste!";
       registrar(2, pCode);
     }
-    if (m===3){
+    if (productsOnScreen===3){
       pText="50% de descuento en tu siguiente compra";
       pCode=code("YV50");
       $("#prizeText").textContent = pText;
@@ -230,7 +278,7 @@ function onSpin(){
 /* ======= Eventos ======= */
 document.addEventListener("DOMContentLoaded", ()=>{
   // Imagen inicial
-  r1.src=randSym(); r2.src=randSym(); r3.src=randSym();
+  r1.src=FILLER_SYMBOLS[0]; r2.src=FILLER_SYMBOLS[1]; r3.src=FILLER_SYMBOLS[2];
   paintName();
 
   $("#changeName").addEventListener("click", ()=>{
@@ -257,3 +305,4 @@ document.addEventListener("DOMContentLoaded", ()=>{
 </script>
 </body>
 </html>
+
