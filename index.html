@@ -105,7 +105,7 @@
 
 <script>
 /* ======= Config ======= */
-const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbwJok5Q3WDZOMZ5AIHibZwLqWJJOsbwiA38O81DWFO_n-c77Lfl9QddfV_jEyQ7svXU/exec";
+const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbxqMFxy2DGXHU62LJQYgx7yHahg_MVxXcTvxQSNO8jFan1HuvWQ_RfyRV0XHagobScH/exec";
 const BACKUP_URL  = ""; // opcional
 
 /* Símbolo ganador (TU PRODUCTO) y rellenos */
@@ -116,6 +116,7 @@ const FILLERS = [
   "img/fillers/imgCarita4.jpg",
   "img/fillers/imgCarita5.jpg"
 ];
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
 /* Probabilidades históricas */
 function chooseProductCount(){
@@ -148,22 +149,15 @@ function code(prefix){ return (prefix+"-"+Math.random().toString(36).slice(2,8))
 const PLACEHOLDER="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAIAAfsBBQq1kTQAAAAASUVORK5CYII=";
 function safeSet(imgEl, src){ imgEl.onerror = ()=>{ imgEl.src = PLACEHOLDER; }; imgEl.src = src; }
 
-/* ======= CUPOS (caché local + refresh en background) ======= */
-let quotaState = null; // {limit, used, remaining}
-
+/* ======= CUPOS (mostrar) ======= */
 async function fetchQuota(){
   const url = `${PRIMARY_URL}?quota=1&player_id=${encodeURIComponent(getPlayerId())}&nombre=${encodeURIComponent(getName())}`;
   try{
     const res = await fetch(url, { method:'GET' });
     if (!res.ok) throw new Error('quota http '+res.status);
     const q = await res.json();
-    quotaState = q;
     renderQuota(q);
-    return q;
-  }catch(e){
-    // si falla, dejamos el estado como está (no bloqueamos el giro por esto)
-    return null;
-  }
+  }catch(e){ /* silencioso */ }
 }
 function renderQuota(q){
   const el = $("#quotaText");
@@ -174,26 +168,38 @@ function renderQuota(q){
   }
 }
 
-/* Construye la combinación final con el producto repetido si corresponde */
-function buildFinalReels(){
-  const count = chooseProductCount();
-  const out = [];
-  for(let i=0;i<count;i++) out.push({src: PRODUCT_IMAGE, type:'product'});
-  for(let i=out.length;i<3;i++) out.push({src: FILLERS[Math.floor(Math.random()*FILLERS.length)], type:'filler'});
-  for(let i=out.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [out[i],out[j]]=[out[j],out[i]]; }
-  return out;
+/* ======= RESERVA ESTRICTA ======= */
+async function reserveSpin(){
+  const url = `${PRIMARY_URL}?reserve=1&player_id=${encodeURIComponent(getPlayerId())}&nombre=${encodeURIComponent(getName())}`;
+  const res = await fetch(url, { method:'GET' });
+  if (!res.ok) throw new Error('reserve http '+res.status);
+  return await res.json(); // {ok, allowed, limit, remaining, token}
 }
 
-/* ======= Backend ======= */
+/* ======= Máquina ======= */
+const r1=$("#r1"), r2=$("#r2"), r3=$("#r3"), msg=$("#resultMsg");
+const spinBtn=$("#spinBtn"), shareBtn=$("#shareBtn");
+
+function animateSpin(frames=18, cb){
+  let i=0;
+  const iv=setInterval(()=>{
+    safeSet(r1, pick(FILLERS));
+    safeSet(r2, pick(FILLERS));
+    safeSet(r3, pick(FILLERS));
+    if(++i>=frames){ clearInterval(iv); cb(); }
+  },60);
+}
+function newEventId(){ return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8); }
+
 function sendBackend(payload){
   const headers = { "Content-Type":"text/plain;charset=utf-8" };
   const body = JSON.stringify(payload);
   try { fetch(PRIMARY_URL, { method:"POST", mode:"no-cors", headers, body }); } catch(e) {}
   if (BACKUP_URL) { try { fetch(BACKUP_URL, { method:"POST", mode:"no-cors", headers, body }); } catch(e) {} }
 }
-function registrar(eventId, matchCount, codigo){
+function registrar(eventId, matchCount, codigo, reserveToken){
   const base={
-    event_id:eventId,
+    event_id:eventId, reserve_token: reserveToken,
     version:VERSION, modo:new URLSearchParams(location.search).get("modo") || "basic",
     nombre_completo:getName()||"Sin nombre",
     empresario:new URLSearchParams(location.search).get("empresario") || "",
@@ -206,35 +212,36 @@ function registrar(eventId, matchCount, codigo){
   if(matchCount===3) return sendBackend({...base,resultado:"GANÓ",premio_clave:"DESC50",codigo});
 }
 
-/* ======= Juego ======= */
-const r1=$("#r1"), r2=$("#r2"), r3=$("#r3"), msg=$("#resultMsg");
-const spinBtn=$("#spinBtn"), shareBtn=$("#shareBtn");
-
-function animateSpin(frames=18, cb){
-  let i=0;
-  const iv=setInterval(()=>{
-    safeSet(r1, FILLERS[Math.floor(Math.random()*FILLERS.length)]);
-    safeSet(r2, FILLERS[Math.floor(Math.random()*FILLERS.length)]);
-    safeSet(r3, FILLERS[Math.floor(Math.random()*FILLERS.length)]);
-    if(++i>=frames){ clearInterval(iv); cb(); }
-  },60);
-}
-function newEventId(){ return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8); }
-
 async function onSpin(){
   if(!getName()){ showNameModal(); return; }
 
-  // ⚡ No hacemos GET aquí para evitar lag. Usamos el estado local.
-  if (quotaState && Number.isFinite(quotaState.limit) && quotaState.remaining<=0){
-    msg.textContent = `Alcanzaste tu límite de ${quotaState.limit} giros hoy.`;
-    return;
-  }
+  spinBtn.disabled=true;
 
-  spinBtn.disabled=true; msg.textContent="Girando...";
+  // 1) pedimos RESERVA (estricto) en paralelo a la animación
+  let reserve = null, reserveError = null;
+  const reservePromise = reserveSpin().then(r=>reserve=r).catch(e=>reserveError=e);
+
+  // 2) animamos inmediatamente (sin lag)
+  msg.textContent="Girando...";
   const eventId = newEventId();
   const finalSet=buildFinalReels();
 
-  animateSpin(18, ()=>{
+  animateSpin(18, async ()=>{
+    // aseguramos que la reserva haya terminado
+    if (!reserve && !reserveError) { try { reserve = await reservePromise; } catch(e){ reserveError=e; } }
+
+    // si no hay cupo, bloqueamos y NO registramos
+    if (reserveError || !reserve?.ok || !reserve?.allowed) {
+      msg.textContent = `Alcanzaste tu límite de giros hoy.`;
+      spinBtn.disabled=false;
+      // refrescamos el contador visible
+      fetchQuota();
+      // mostramos algo neutro
+      safeSet(r1, pick(FILLERS)); safeSet(r2, pick(FILLERS)); safeSet(r3, pick(FILLERS));
+      return;
+    }
+
+    // 3) mostramos el resultado
     safeSet(r1, finalSet[0].src);
     safeSet(r2, finalSet[1].src);
     safeSet(r3, finalSet[2].src);
@@ -243,40 +250,40 @@ async function onSpin(){
     let pText="", pCode="";
     if(productsOnScreen===0){
       msg.textContent="Sin premio, vuelve a intentarlo.";
-      registrar(eventId,0,"");
+      registrar(eventId,0,"", reserve.token);
     }else if(productsOnScreen===1){
       pText="10% de descuento en tu próxima compra"; pCode=code("YV10");
       $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
-      msg.textContent="¡Ganaste!"; registrar(eventId,1,pCode);
+      msg.textContent="¡Ganaste!"; registrar(eventId,1,pCode, reserve.token);
     }else if(productsOnScreen===2){
       pText="1 producto de obsequio por compras > $100.000 (no válido para kits)"; pCode=code("OBSEQ1");
       $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
-      msg.textContent="¡Ganaste!"; registrar(eventId,2,pCode);
+      msg.textContent="¡Ganaste!"; registrar(eventId,2,pCode, reserve.token);
     }else{
       pText="50% de descuento en tu siguiente compra"; pCode=code("YV50");
       $("#prizeText").textContent=pText; $("#prizeCode").textContent=pCode; $("#prizeDlg").showModal();
-      msg.textContent="¡Ganaste!"; registrar(eventId,3,pCode);
+      msg.textContent="¡Ganaste!"; registrar(eventId,3,pCode, reserve.token);
     }
 
-    // Actualizamos el cupo LOCAL inmediatamente (cero lag).
-    if (quotaState && Number.isFinite(quotaState.limit)) {
-      quotaState.used = (quotaState.used||0) + 1;
-      quotaState.remaining = Math.max(0, quotaState.limit - quotaState.used);
-      renderQuota(quotaState);
-    }
-
-    // Y refrescamos del servidor en background para sincronizar
-    setTimeout(fetchQuota, 1200);
-
+    // 4) refrescamos cupo visible
+    setTimeout(fetchQuota, 800);
     spinBtn.disabled=false;
   });
 }
 
+/* ======= Helpers ======= */
+function buildFinalReels(){
+  const count = chooseProductCount();
+  const out = [];
+  for(let i=0;i<count;i++) out.push({src: PRODUCT_IMAGE, type:'product'});
+  for(let i=out.length;i<3;i++) out.push({src: pick(FILLERS), type:'filler'});
+  for(let i=out.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [out[i],out[j]]=[out[j],out[i]]; }
+  return out;
+}
+
 /* ======= Eventos ======= */
 document.addEventListener("DOMContentLoaded", async ()=>{
-  safeSet(r1, FILLERs_INITIAL()[0]); // helper for initial safe selection
-  safeSet(r2, FILLERs_INITIAL()[1]);
-  safeSet(r3, FILLERs_INITIAL()[2]);
+  safeSet(r1, pick(FILLERS)); safeSet(r2, pick(FILLERS)); safeSet(r3, pick(FILLERS));
   paintName();
 
   $("#changeName").addEventListener("click", ()=>{ localStorage.removeItem(NAME_KEY); showNameModal(); });
@@ -291,17 +298,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
          else navigator.clipboard && navigator.clipboard.writeText(url); }catch(e){}
   });
 
-  // Cargamos cupo una sola vez al inicio (rápido, en background)
+  // pinta contador al cargar
   fetchQuota();
 });
-
-// pequeño helper para seleccionar 3 fillers iniciales sin repetir mucho
-function FILLERs_INITIAL(){
-  const a = [...FILLERS];
-  const r = [];
-  for(let i=0;i<3;i++){ r.push(a[Math.floor(Math.random()*a.length)]); }
-  return r;
-}
 </script>
 </body>
 </html>
+
