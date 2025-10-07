@@ -13,7 +13,7 @@
   h1{font-size:42px;margin:14px 0 6px;text-align:center}
   h1 small{display:block;font-size:14px;color:var(--muted);font-weight:500;margin-top:6px}
   .badge{display:inline-block;margin:8px auto 18px;background:#3d2f60;padding:10px 14px;border-radius:999px;font-weight:700}
-  .topbar{display:flex;gap:10px;justify-content:center;align-items:center;margin:4px 0 8px}
+  .topbar{display:flex;gap:10px;justify-content:center;align-items:center;margin:4px 0 8px;flex-wrap:wrap}
   .topbar .muted{color:var(--muted)}
   .btn{appearance:none;border:0;background:var(--btn2);color:var(--txt);padding:8px 14px;border-radius:16px;font-weight:700;cursor:pointer}
   .btn.primary{background:var(--btn); color:#1f1300; box-shadow:0 6px 20px rgba(245,158,11,.25)}
@@ -23,7 +23,7 @@
   .reel{background:#0b0713;border:1px solid #3b2e5f;border-radius:18px;display:flex;align-items:center;justify-content:center;padding:10px;aspect-ratio:1/1;box-shadow:inset 0 8px 20px rgba(0,0,0,.35)}
   .reel img{width:100%;height:100%;object-fit:contain;border-radius:14px;background:#120b1d}
   .actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .note{color:var(--muted);margin:10px 0 0;display:flex;gap:6px;align-items:center}
+  .note{color:var(--muted);margin:10px 0 0;display:flex;gap:6px;align-items:center;min-height:22px}
   .note .dot{width:8px;height:8px;background:#ffd54a;border-radius:50%}
   .quota{color:var(--muted);font-size:14px;margin-left:auto}
   .rules{margin-top:18px;background:#231a38;border:1px solid #3b2e5f;border-radius:16px;overflow:hidden}
@@ -48,10 +48,11 @@
     <span class="muted">Jugador:</span>
     <b id="playerName">no registrado</b>
     <button id="changeName" class="btn">Cambiar nombre</button>
+    <button id="idBtn" class="btn">Mi ID</button>
   </div>
 
   <div class="badge">🎰 Tragamonedas Yavalva</div>
-  <h1>Gira y gana premios 🎁<small>v6.4 UX rápida + reserva paralela</small></h1>
+  <h1>Gira y gana premios 🎁<small>v6.5 UX rápida + reserva paralela</small></h1>
 
   <div class="machine" id="machine">
     <div class="reels">
@@ -105,9 +106,10 @@
 
 <script>
 /* ======= Config ======= */
-const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbzbPD8D0zBFxFRCOcNwt_yCbEUw_JbWjuRmUGQZcop_4jV3GbbSjLEikr_hVKBEaZJt/exec";
+const PRIMARY_URL = "https://script.google.com/macros/s/AKfycbyDtfHUH0quGfb91uCgtyRvY15eMk0Iukb7l_SMs00yY7Y3ecnsJMh4QJfMqZq8ewb7/exec";
+const VERSION = "v6.5";
 
-/* Símbolos */
+/* Símbolos (ajusta rutas si cambias imágenes) */
 const PRODUCT_IMAGE = "img/products/imgCarita3.jpg";
 const FILLERS = [
   "img/fillers/imgCarita1.jpg",
@@ -127,10 +129,10 @@ function chooseProductCount(){
 }
 
 /* ======= Base ======= */
-const VERSION = "v6.4";
 const NAME_KEY = "yv_player_name";
 const PID_KEY  = "yv_player_id";
 const $ = s => document.querySelector(s);
+const qs = new URLSearchParams(location.search);
 
 function getName(){ return localStorage.getItem(NAME_KEY) || ""; }
 function setName(v){ localStorage.setItem(NAME_KEY,(v||"").trim()); paintName(); }
@@ -150,41 +152,39 @@ function code(prefix){ return (prefix+"-"+Math.random().toString(36).slice(2,8))
 const PLACEHOLDER="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAIAAfsBBQq1kTQAAAAASUVORK5CYII=";
 function safeSet(imgEl, src){ imgEl.onerror = ()=>{ imgEl.src = PLACEHOLDER; }; imgEl.src = src; }
 
-/* ======= Helpers red/timeout ======= */
-function withTimeout(promise, ms=1500){
-  const ac = new AbortController();
-  const t = setTimeout(()=>ac.abort(), ms);
-  return Promise.race([
-    promise(ac.signal).finally(()=>clearTimeout(t)),
-    new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")), ms+10))
-  ]);
+/* ======= Helpers fetch/timeout ======= */
+async function getJSON(url, timeout=2200){
+  const controller = new AbortController();
+  const t = setTimeout(()=>controller.abort(), timeout);
+  try{
+    const res = await fetch(url, { signal: controller.signal });
+    return await res.json();
+  }catch(e){
+    return null; // tratamos como fallo de conexión/timeout
+  }finally{ clearTimeout(t); }
 }
 
 /* ======= CUPOS ======= */
 async function fetchQuota(){
-  try{
-    const url = `${PRIMARY_URL}?quota=1&player_id=${encodeURIComponent(getPlayerId())}`;
-    const res = await fetch(url, { method:'GET' });
-    const q = await res.json();
-    renderQuota(q);
-  }catch(e){ /* silencioso */ }
+  const url = `${PRIMARY_URL}?quota=1&player_id=${encodeURIComponent(getPlayerId())}`;
+  const q = await getJSON(url, 2200);
+  renderQuota(q);
 }
 function renderQuota(q){
   const el = $("#quotaText");
   if (q && Number.isFinite(q.limit) && Number.isFinite(q.used)) {
-    el.textContent = `Te quedan ${Math.max(0,q.remaining)} de ${q.limit} giros hoy`;
+    const rem = (q.remaining!=null)? q.remaining : Math.max(0, q.limit - q.used);
+    el.textContent = `Te quedan ${Math.max(0,rem)} de ${q.limit} giros hoy`;
   } else { el.textContent = ``; }
 }
 
 /* ======= RESERVA (no bloquear UI) ======= */
 async function reserveSpin(){
-  const doFetch = (signal)=>fetch(`${PRIMARY_URL}?reserve=1&player_id=${encodeURIComponent(getPlayerId())}`, { method:'GET', signal })
-                               .then(r=>r.json());
-  try{
-    return await withTimeout(doFetch, 2000); // 2 s de paciencia
-  }catch(e){
-    return { ok:false, allowed:false, reason:'reserve_failed' }; // importante: NO dejar pasar sin token
-  }
+  const force = qs.get("force")==="1" ? "&force=1" : "";
+  const url = `${PRIMARY_URL}?reserve=1&player_id=${encodeURIComponent(getPlayerId())}${force}`;
+  const r = await getJSON(url, 2500);
+  if (!r) return { ok:false, allowed:false, reason:"reserve_failed" };
+  return r;
 }
 
 /* ======= Máquina ======= */
@@ -208,7 +208,6 @@ function sendBackend(payload){
   try { fetch(PRIMARY_URL, { method:"POST", mode:"no-cors", headers, body }); } catch(e) {}
 }
 function registrar(eventId, matchCount, codigo, reserveToken){
-  const qs = new URLSearchParams(location.search);
   const base={
     event_id:eventId, reserve_token: reserveToken,
     version:VERSION, modo: qs.get("modo") || "basic",
@@ -228,6 +227,7 @@ function buildFinalReels(){
   const out = [];
   for(let i=0;i<count;i++) out.push({src: PRODUCT_IMAGE, type:'product'});
   for(let i=out.length;i<3;i++) out.push({src: pick(FILLERS), type:'filler'});
+  // shuffle
   for(let i=out.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [out[i],out[j]]=[out[j],out[i]]; }
   return out;
 }
@@ -235,25 +235,30 @@ function buildFinalReels(){
 async function onSpin(){
   if(!getName()){ showNameModal(); return; }
   spinBtn.disabled=true;
-
-  // Empieza animación YA para una UX fluida
   msg.textContent="Girando...";
+
   const eventId = newEventId();
   const finalSet=buildFinalReels();
 
-  // En paralelo pedimos la reserva
+  // Reserva en paralelo
   const reserve = await reserveSpin();
 
-  // Si el backend dice que NO o la reserva falló, paramos sin consumir jugada
-  if (!reserve.ok || reserve.allowed === false || !reserve.token){
+  // Si la reserva falla por red/timeout → NO consumimos jugada
+  if (!reserve || reserve.ok===false) {
     animateSpin(12, ()=>{
-      // Pintamos el set final para que el usuario vea "algo"
-      safeSet(r1, pick(FILLERS));
-      safeSet(r2, pick(FILLERS));
-      safeSet(r3, pick(FILLERS));
-      msg.textContent = (reserve && reserve.allowed===false)
-        ? "Alcanzaste tu límite de giros hoy."
-        : "Problemas de conexión. Inténtalo de nuevo.";
+      safeSet(r1, pick(FILLERS)); safeSet(r2, pick(FILLERS)); safeSet(r3, pick(FILLERS));
+      msg.textContent = "Problemas de conexión. Inténtalo de nuevo.";
+      spinBtn.disabled=false;
+      fetchQuota();
+    });
+    return;
+  }
+
+  // Si el backend respondió pero NO permite girar (o no entregó token) → límite
+  if (reserve.allowed === false || !reserve.token){
+    animateSpin(12, ()=>{
+      safeSet(r1, pick(FILLERS)); safeSet(r2, pick(FILLERS)); safeSet(r3, pick(FILLERS));
+      msg.textContent = "Alcanzaste tu límite de giros hoy.";
       spinBtn.disabled=false;
       fetchQuota();
     });
@@ -305,6 +310,13 @@ document.addEventListener("DOMContentLoaded", ()=>{
     const url=location.href;
     try{ if(navigator.share) await navigator.share({title:"Tragamonedas Yavalva",text:"¡Gira y gana premios!",url});
          else navigator.clipboard && navigator.clipboard.writeText(url); }catch(e){}
+  });
+
+  // NUEVO: botón para ver/copiar el player_id
+  $("#idBtn").addEventListener("click", async ()=>{
+    const id = getPlayerId();
+    try { await navigator.clipboard.writeText(id); } catch(e) {}
+    alert("Tu player_id es:\n" + id + "\n(ya lo copié al portapapeles)");
   });
 
   fetchQuota();
